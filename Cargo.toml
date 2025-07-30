@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+clap = { version = "4.5.42", features = ["derive"] }
+cosmic-protocols = { version = "0.1.0", git = "https://github.com/pop-os/cosmic-protocols" }
+log = "0.4.27"
+simple_logger = "5.0.0"
+wayland-client = "0.31.11"
