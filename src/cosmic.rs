@@ -7,15 +7,15 @@ use cosmic_protocols::{
         zcosmic_toplevel_info_v1::{self, ZcosmicToplevelInfoV1},
     },
     workspace::v2::client::{
-        zcosmic_workspace_handle_v2::{self, ZcosmicWorkspaceHandleV2},
+        zcosmic_workspace_handle_v2::ZcosmicWorkspaceHandleV2,
         zcosmic_workspace_manager_v2::ZcosmicWorkspaceManagerV2,
     },
 };
 use log::{debug, error, info, warn};
 use wayland_client::{
-    Connection, Dispatch, Proxy, QueueHandle, event_created_child,
+    Connection, Dispatch, Proxy, QueueHandle, WEnum, event_created_child,
     protocol::{
-        wl_output,
+        wl_output::{self, WlOutput},
         wl_registry::{self, WlRegistry},
     },
 };
@@ -29,6 +29,9 @@ pub struct CosmicTopLevelInfo {
 }
 
 pub const TOPLEVEL_HANDLE_DISPLAY_NAME: &str = "COSMIC toplevel handle";
+
+pub const WL_OUTPUT_INTERFACE: &str = "wl_output";
+pub const WL_OUTPUT_DISPLAY_NAME: &str = "Wl Output";
 
 impl CosmicTopLevelInfo {
     pub const INTERFACE: &str = "zcosmic_toplevel_info_v1";
@@ -60,6 +63,7 @@ pub struct CosmicWorkspaceManager {
     manager: ZcosmicWorkspaceManagerV2,
     name: u32,
 }
+
 impl CosmicWorkspaceManager {
     pub const INTERFACE: &str = "zcosmic_workspace_manager_v2";
     pub const DISPLAY_NAME: &str = "COSMIC workspace manager";
@@ -90,7 +94,7 @@ impl CosmicWorkspaceManager {
 pub struct AppData {
     pub toplevel_info: Option<CosmicTopLevelInfo>,
     pub workspace_manager: Option<CosmicWorkspaceManager>,
-    pub outputs: Vec<(wl_output::WlOutput, String)>,
+    pub outputs: Vec<Output>,
     pub toplevels: Vec<Toplevel>,
     pub workspaces: Vec<(Vec<(ZcosmicWorkspaceHandleV2, Option<String>)>,)>,
 }
@@ -128,10 +132,16 @@ impl Dispatch<WlRegistry, UserData> for AppData {
                         Default::default(),
                     ));
                 }
+                WL_OUTPUT_INTERFACE => {
+                    registry.bind::<WlOutput, UserData, _>(name, 4, qh, UserData::default());
+                }
                 _ => {
-                    // if interface.contains("wl") || interface.contains("cosmic") {
-                    //     warn!("unused wl/cosmic interface: {interface}");
-                    // }
+                    if interface.contains("wl")
+                        || interface.contains("cosmic")
+                        || interface.contains("workspace")
+                    {
+                        warn!("unused wl/cosmic interface: {interface}");
+                    }
                     // we don't care about this interface
                 }
             },
@@ -257,7 +267,7 @@ impl Dispatch<ZcosmicToplevelHandleV1, UserData> for AppData {
                 toplevel.state = state
                     .chunks_exact(4)
                     .map(|chunk| u32::from_ne_bytes(chunk.try_into().unwrap()))
-                    .flat_map(|val| State::try_from(val).ok())
+                    .flat_map(|val| ToplevelState::try_from(val).ok())
                     .collect::<Vec<_>>()
             }
             Event::Geometry {
@@ -304,14 +314,97 @@ impl Dispatch<ZcosmicToplevelHandleV1, UserData> for AppData {
 
 impl Dispatch<ZcosmicWorkspaceManagerV2, UserData> for AppData {
     fn event(
-        state: &mut Self,
-        proxy: &ZcosmicWorkspaceManagerV2,
+        _state: &mut Self,
+        _proxy: &ZcosmicWorkspaceManagerV2,
         event: <ZcosmicWorkspaceManagerV2 as Proxy>::Event,
-        data: &UserData,
-        conn: &Connection,
-        qhandle: &QueueHandle<Self>,
+        _data: &UserData,
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
     ) {
-        warn!(target: CosmicWorkspaceManager::DISPLAY_NAME, "not implemented: handle event: {event:?}")
+        warn!(target: CosmicWorkspaceManager::DISPLAY_NAME, "not implemented: handle event: {event:?}");
+    }
+}
+
+impl Dispatch<WlOutput, UserData> for AppData {
+    fn event(
+        app_data: &mut Self,
+        handle: &WlOutput,
+        event: <WlOutput as Proxy>::Event,
+        _udata: &UserData,
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        use wl_output::Event;
+        warn!(target: WL_OUTPUT_DISPLAY_NAME, "not implemented: handle event: {event:?}");
+
+        let output = app_data.outputs.iter_mut().find(|o| &o.handle == handle);
+
+        match event {
+            Event::Geometry {
+                x,
+                y,
+                physical_width,
+                physical_height,
+                subpixel: _,
+                make,
+                model,
+                transform: _,
+            } => {
+                if let Some(output) = output {
+                    output.x = x;
+                    output.y = y;
+                    output.phys_width = physical_width;
+                    output.phys_height = physical_height;
+                    output.make = make;
+                    output.model = model;
+                } else {
+                    app_data.outputs.push(Output::new(
+                        handle.clone(),
+                        x,
+                        y,
+                        physical_width,
+                        physical_height,
+                        make,
+                        model,
+                    ));
+                }
+            }
+            Event::Mode {
+                flags,
+                width,
+                height,
+                refresh,
+            } => {
+                let Some(output) = output else {
+                    error!("Got unknown output handle: {}", handle.id());
+                    return;
+                };
+                output
+                    .modes
+                    .push(OutputMode::new(width, height, refresh, flags));
+            }
+            Event::Done => {
+                // all info about output recieved, we can just ignore this
+            }
+            Event::Scale { factor: _ } => {
+                // dont care
+            }
+            Event::Name { name } => {
+                let Some(output) = output else {
+                    error!("Got unknown output handle: {}", handle.id());
+                    return;
+                };
+                output.name = Some(name);
+            }
+            Event::Description { description } => {
+                let Some(output) = output else {
+                    error!("Got unknown output handle: {}", handle.id());
+                    return;
+                };
+                output.description = Some(description);
+            }
+            _ => todo!(),
+        }
     }
 }
 
@@ -321,7 +414,7 @@ pub struct Toplevel {
     pub app_id: Option<String>,
     pub outputs: Vec<wl_output::WlOutput>,
     pub workspaces: Vec<ZcosmicWorkspaceHandleV2>,
-    pub state: Vec<State>,
+    pub state: Vec<ToplevelState>,
 }
 
 impl Toplevel {
@@ -337,23 +430,102 @@ impl Toplevel {
     }
 }
 
+pub struct Output {
+    pub handle: WlOutput,
+    pub name: Option<String>,
+    pub description: Option<String>,
+    /// x position of output in compositor space
+    pub x: i32,
+    /// y position of output in compositor space
+    pub y: i32,
+    /// size of output in millimeters, can be 0
+    pub phys_width: i32,
+    /// size of output in millimeters, can be 0
+    pub phys_height: i32,
+    pub make: String,
+    pub model: String,
+
+    pub modes: Vec<OutputMode>,
+}
+
+impl Output {
+    pub fn new(
+        handle: WlOutput,
+        x: i32,
+        y: i32,
+        phys_width: i32,
+        phys_height: i32,
+        make: String,
+        model: String,
+    ) -> Self {
+        Self {
+            handle,
+            name: None,
+            description: None,
+            x,
+            y,
+            phys_width,
+            phys_height,
+            make,
+            model,
+            modes: Vec::new(),
+        }
+    }
+
+    pub fn current_mode(&self) -> Option<&OutputMode> {
+        self.modes.iter().find(|m| m.current)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct OutputMode {
+    pub width: i32,
+    pub height: i32,
+    pub refresh: i32,
+    pub current: bool,
+    pub preferred: bool,
+}
+
+impl OutputMode {
+    pub fn new(width: i32, height: i32, refresh: i32, flags: WEnum<wl_output::Mode>) -> Self {
+        use wl_output::Mode;
+
+        let (current, preferred) = if let Ok(flags) = flags.into_result() {
+            (
+                flags.contains(Mode::Current),
+                flags.contains(Mode::Preferred),
+            )
+        } else {
+            (false, false)
+        };
+
+        Self {
+            width,
+            height,
+            refresh,
+            preferred,
+            current,
+        }
+    }
+}
+
 #[repr(u32)]
 #[derive(Debug, Clone, Copy)]
-pub enum State {
+pub enum ToplevelState {
     Maximized = 0,
     Minimized = 1,
     Activated = 2,
     Fullscreen = 3,
 }
 
-impl TryFrom<u32> for State {
+impl TryFrom<u32> for ToplevelState {
     type Error = ();
-    fn try_from(val: u32) -> Result<State, ()> {
+    fn try_from(val: u32) -> Result<ToplevelState, ()> {
         match val {
-            0 => Ok(State::Maximized),
-            1 => Ok(State::Minimized),
-            2 => Ok(State::Activated),
-            3 => Ok(State::Fullscreen),
+            0 => Ok(ToplevelState::Maximized),
+            1 => Ok(ToplevelState::Minimized),
+            2 => Ok(ToplevelState::Activated),
+            3 => Ok(ToplevelState::Fullscreen),
             _ => Err(()),
         }
     }

@@ -1,5 +1,8 @@
+mod args;
 mod cosmic;
 
+use args::{Arguments, Command};
+use clap::Parser;
 use cosmic::AppData;
 use log::{LevelFilter, debug};
 use simple_logger::SimpleLogger;
@@ -15,6 +18,8 @@ fn main() {
         .env()
         .init()
         .unwrap();
+
+    let args = Arguments::parse();
 
     let connection: Connection = Connection::connect_to_env().unwrap();
     let display: WlDisplay = connection.display();
@@ -33,12 +38,47 @@ fn main() {
         count += 1;
     }
 
-    assert_eq!(count, 2);
+    match args.command {
+        Command::Toplevels => toplevels(&app_data),
+        Command::Outputs => outputs(&app_data),
+    }
 
+    assert_eq!(count, 2);
+}
+
+fn outputs(app_data: &AppData) {
+    println!("Outputs:");
+    for output in &app_data.outputs {
+        print_otpion(output.name.as_ref(), "Name");
+        print_otpion(output.description.as_ref(), "Description");
+
+        if cfg!(debug_assertions) {
+            println!("ObjectId: {}", output.handle.id());
+        }
+
+        if let Some(mode) = output.current_mode() {
+            println!("width: {}", mode.width);
+            println!("height: {}", mode.height);
+            println!("refresh: {}", mode.refresh);
+            println!("preferred: {}", mode.preferred);
+        }
+
+        println!("x: {}", output.x);
+        println!("y: {}", output.y);
+        println!("Make: {}", output.make);
+        println!("Model: {}", output.model);
+        println!("phys width: {}", output.phys_width);
+        println!("phys height: {}", output.phys_height);
+
+        println!();
+    }
+}
+
+fn toplevels(app_data: &AppData) {
     println!("Toplevels:");
-    for toplevel in app_data.toplevels {
-        print_otpion(toplevel.title, "Title");
-        print_otpion(toplevel.app_id, "AppId");
+    for toplevel in &app_data.toplevels {
+        print_otpion(toplevel.title.as_ref(), "Title");
+        print_otpion(toplevel.app_id.as_ref(), "AppId");
         if cfg!(debug_assertions) {
             println!("ObjectId: {}", toplevel.handle.id());
         }
