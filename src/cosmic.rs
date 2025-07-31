@@ -7,10 +7,11 @@ use cosmic_protocols::{
         zcosmic_toplevel_info_v1::{self, ZcosmicToplevelInfoV1},
     },
     workspace::v2::client::{
-        zcosmic_workspace_handle_v2, zcosmic_workspace_manager_v2::ZcosmicWorkspaceManagerV2,
+        zcosmic_workspace_handle_v2::{self, ZcosmicWorkspaceHandleV2},
+        zcosmic_workspace_manager_v2::ZcosmicWorkspaceManagerV2,
     },
 };
-use log::{debug, info, warn};
+use log::{debug, error, info, warn};
 use wayland_client::{
     Connection, Dispatch, Proxy, QueueHandle, event_created_child,
     protocol::{
@@ -91,12 +92,7 @@ pub struct AppData {
     pub workspace_manager: Option<CosmicWorkspaceManager>,
     pub outputs: Vec<(wl_output::WlOutput, String)>,
     pub toplevels: Vec<Toplevel>,
-    pub workspaces: Vec<(
-        Vec<(
-            zcosmic_workspace_handle_v2::ZcosmicWorkspaceHandleV2,
-            Option<String>,
-        )>,
-    )>,
+    pub workspaces: Vec<(Vec<(ZcosmicWorkspaceHandleV2, Option<String>)>,)>,
 }
 
 impl Dispatch<WlRegistry, UserData> for AppData {
@@ -133,6 +129,9 @@ impl Dispatch<WlRegistry, UserData> for AppData {
                     ));
                 }
                 _ => {
+                    // if interface.contains("wl") || interface.contains("cosmic") {
+                    //     warn!("unused wl/cosmic interface: {interface}");
+                    // }
                     // we don't care about this interface
                 }
             },
@@ -160,14 +159,28 @@ impl Dispatch<WlRegistry, UserData> for AppData {
 
 impl Dispatch<ZcosmicToplevelInfoV1, UserData> for AppData {
     fn event(
-        state: &mut Self,
-        proxy: &ZcosmicToplevelInfoV1,
+        app_data: &mut Self,
+        _proxy: &ZcosmicToplevelInfoV1,
         event: <ZcosmicToplevelInfoV1 as wayland_client::Proxy>::Event,
-        data: &UserData,
-        conn: &Connection,
-        qhandle: &QueueHandle<Self>,
+        _udata: &UserData,
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
     ) {
-        warn!(target: CosmicTopLevelInfo::DISPLAY_NAME, "not implemented: handle event: {event:?}")
+        use zcosmic_toplevel_info_v1::Event;
+        info!(target: CosmicTopLevelInfo::DISPLAY_NAME, "event: {event:?}");
+
+        match event {
+            Event::Toplevel { toplevel: handle } => {
+                app_data.toplevels.push(Toplevel::new(handle));
+            }
+            Event::Finished => {
+                app_data.toplevel_info = None;
+            }
+            Event::Done => {
+                // all info about active toplevels recieved. We don't need to do anything
+            }
+            _ => warn!("unknown event: {event:?}"),
+        }
     }
 
     event_created_child!(
@@ -181,14 +194,111 @@ impl Dispatch<ZcosmicToplevelInfoV1, UserData> for AppData {
 
 impl Dispatch<ZcosmicToplevelHandleV1, UserData> for AppData {
     fn event(
-        state: &mut Self,
-        proxy: &ZcosmicToplevelHandleV1,
+        app_data: &mut Self,
+        toplevel: &ZcosmicToplevelHandleV1,
         event: <ZcosmicToplevelHandleV1 as Proxy>::Event,
-        data: &UserData,
-        conn: &Connection,
-        qhandle: &QueueHandle<Self>,
+        _udata: &UserData,
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
     ) {
-        warn!(target: TOPLEVEL_HANDLE_DISPLAY_NAME, "not implemented: handle event: {event:?}")
+        use zcosmic_toplevel_handle_v1::Event;
+        info!(target: TOPLEVEL_HANDLE_DISPLAY_NAME, "handle event: {event:?}");
+
+        let Some(toplevel) = app_data
+            .toplevels
+            .iter_mut()
+            .find(|t| &t.handle == toplevel)
+        else {
+            error!("Got unknown toplevel handle: {}", toplevel.id());
+            return;
+        };
+
+        match event {
+            Event::Closed => {}
+            Event::Done => {}
+            Event::Title { title } => toplevel.title = Some(title),
+            Event::AppId { app_id } => toplevel.app_id = Some(app_id),
+            Event::OutputEnter { output } => {
+                debug!(
+                    "{:?}({}) enter output {}",
+                    toplevel.title,
+                    toplevel.handle.id(),
+                    output.id()
+                );
+                // TODO
+            }
+            Event::OutputLeave { output } => {
+                debug!(
+                    "{:?}({}) leave output {}",
+                    toplevel.title,
+                    toplevel.handle.id(),
+                    output.id()
+                ); // TODO
+            }
+            Event::WorkspaceEnter { workspace } => {
+                debug!(
+                    "{:?}({}) enter workspace {}",
+                    toplevel.title,
+                    toplevel.handle.id(),
+                    workspace.id()
+                );
+                // TODO
+            }
+            Event::WorkspaceLeave { workspace } => {
+                debug!(
+                    "{:?}({}) leave workspace {}",
+                    toplevel.title,
+                    toplevel.handle.id(),
+                    workspace.id()
+                );
+                // TODO
+            }
+            Event::State { state } => {
+                toplevel.state = state
+                    .chunks_exact(4)
+                    .map(|chunk| u32::from_ne_bytes(chunk.try_into().unwrap()))
+                    .flat_map(|val| State::try_from(val).ok())
+                    .collect::<Vec<_>>()
+            }
+            Event::Geometry {
+                output,
+                x,
+                y,
+                width,
+                height,
+            } => {
+                debug!(
+                    "{:?}({}) geo: x: {}, y: {}, w: {}, h: {}, out: {}",
+                    toplevel.title,
+                    toplevel.handle.id(),
+                    x,
+                    y,
+                    width,
+                    height,
+                    output.id()
+                )
+                // TODO
+            }
+            Event::ExtWorkspaceEnter { workspace } => {
+                debug!(
+                    "{:?}({}) enter workspace ext {}",
+                    toplevel.title,
+                    toplevel.handle.id(),
+                    workspace.id()
+                );
+                // TODO
+            }
+            Event::ExtWorkspaceLeave { workspace } => {
+                debug!(
+                    "{:?}({}) leave workspace ext {}",
+                    toplevel.title,
+                    toplevel.handle.id(),
+                    workspace.id()
+                );
+                // TODO
+            }
+            _ => warn!("unknown event: {event:?}"),
+        }
     }
 }
 
@@ -206,12 +316,25 @@ impl Dispatch<ZcosmicWorkspaceManagerV2, UserData> for AppData {
 }
 
 pub struct Toplevel {
-    pub handle: zcosmic_toplevel_handle_v1::ZcosmicToplevelHandleV1,
+    pub handle: ZcosmicToplevelHandleV1,
     pub title: Option<String>,
     pub app_id: Option<String>,
     pub outputs: Vec<wl_output::WlOutput>,
-    pub workspaces: Vec<zcosmic_workspace_handle_v2::ZcosmicWorkspaceHandleV2>,
+    pub workspaces: Vec<ZcosmicWorkspaceHandleV2>,
     pub state: Vec<State>,
+}
+
+impl Toplevel {
+    pub fn new(handle: ZcosmicToplevelHandleV1) -> Self {
+        Self {
+            handle,
+            title: Default::default(),
+            app_id: Default::default(),
+            outputs: Default::default(),
+            workspaces: Default::default(),
+            state: Default::default(),
+        }
+    }
 }
 
 #[repr(u32)]
