@@ -11,12 +11,17 @@ use cosmic_protocols::{
         zcosmic_workspace_manager_v2::ZcosmicWorkspaceManagerV2,
     },
 };
+use log::trace;
 use wayland_client::{
     Connection, Dispatch, Proxy, QueueHandle, WEnum, event_created_child,
     protocol::{
         wl_output::{self, WlOutput},
         wl_registry::{self, WlRegistry},
     },
+};
+use wayland_protocols::ext::foreign_toplevel_list::v1::client::{
+    ext_foreign_toplevel_handle_v1::ExtForeignToplevelHandleV1,
+    ext_foreign_toplevel_list_v1::{self, ExtForeignToplevelListV1},
 };
 
 #[allow(unused)]
@@ -35,6 +40,10 @@ pub const TOPLEVEL_HANDLE_DISPLAY_NAME: &str = "COSMIC toplevel handle";
 pub const WL_OUTPUT_INTERFACE: &str = "wl_output";
 pub const WL_OUTPUT_DISPLAY_NAME: &str = "Wl Output";
 
+pub const EXT_TOPLEVEL_LIST_INTERFACE: &str = "ext_foreign_toplevel_list_v1";
+pub const EXT_TOPLEVEL_LIST_NAME: &str = "Foreign toplevel list";
+pub const EXT_TOPLEVEL_HANDLE_NAME: &str = "Foreign toplevel handle";
+
 impl CosmicTopLevelInfo {
     pub const INTERFACE: &str = "zcosmic_toplevel_info_v1";
     pub const DISPLAY_NAME: &str = "COSMIC toplevel info";
@@ -45,7 +54,7 @@ impl CosmicTopLevelInfo {
         qh: &QueueHandle<AppData>,
         udata: UserData,
     ) -> Self {
-        let info = registry.bind::<ZcosmicToplevelInfoV1, _, _>(name, 1, qh, udata);
+        let info = registry.bind::<ZcosmicToplevelInfoV1, _, _>(name, 3, qh, udata);
 
         debug!("bind: {info:?}");
 
@@ -137,6 +146,14 @@ impl Dispatch<WlRegistry, UserData> for AppData {
                 WL_OUTPUT_INTERFACE => {
                     registry.bind::<WlOutput, UserData, _>(name, 4, qh, UserData::default());
                 }
+                EXT_TOPLEVEL_LIST_INTERFACE => {
+                    registry.bind::<ExtForeignToplevelListV1, UserData, _>(
+                        name,
+                        1,
+                        qh,
+                        UserData::default(),
+                    );
+                }
                 _ => {
                     //                     if interface.contains("wl")
                     //                         || interface.contains("cosmic")
@@ -182,8 +199,8 @@ impl Dispatch<ZcosmicToplevelInfoV1, UserData> for AppData {
         debug!(target: CosmicTopLevelInfo::DISPLAY_NAME, "event: {event:?}");
 
         match event {
-            Event::Toplevel { toplevel: handle } => {
-                app_data.toplevels.push(Toplevel::new(handle));
+            Event::Toplevel { .. } => {
+                error!(target: CosmicTopLevelInfo::DISPLAY_NAME, "This event should never be triggered starting with interface version 2");
             }
             Event::Finished => {
                 app_data.toplevel_info = None;
@@ -314,6 +331,91 @@ impl Dispatch<ZcosmicToplevelHandleV1, UserData> for AppData {
     }
 }
 
+impl Dispatch<ExtForeignToplevelListV1, UserData> for AppData {
+    fn event(
+        app_data: &mut Self,
+        _proxy: &ExtForeignToplevelListV1,
+        event: <ExtForeignToplevelListV1 as Proxy>::Event,
+        _data: &UserData,
+        _conn: &Connection,
+        qhandle: &QueueHandle<Self>,
+    ) {
+        use ext_foreign_toplevel_list_v1::Event;
+
+        let Some(toplevel_info) = &app_data.toplevel_info else {
+            panic!(
+                "missing {}({}) protocol",
+                CosmicTopLevelInfo::DISPLAY_NAME,
+                CosmicTopLevelInfo::INTERFACE
+            );
+        };
+
+        match event {
+            Event::Toplevel {
+                toplevel: ext_handle,
+            } => {
+                let cosmic_handle = toplevel_info.info.get_cosmic_toplevel(
+                    &ext_handle,
+                    qhandle,
+                    UserData::default(),
+                );
+                app_data
+                    .toplevels
+                    .push(Toplevel::new(cosmic_handle, ext_handle));
+            }
+            Event::Finished => {
+                trace!(target: EXT_TOPLEVEL_LIST_NAME, "ignore event: {event:?}");
+            }
+            _ => todo!(),
+        }
+    }
+
+    event_created_child!(
+        AppData,
+        ExtForeignToplevelListV1,
+        [
+            ext_foreign_toplevel_list_v1::EVT_TOPLEVEL_OPCODE => (ExtForeignToplevelHandleV1, UserData::default()),
+        ]
+    );
+}
+
+impl Dispatch<ExtForeignToplevelHandleV1, UserData> for AppData {
+    fn event(
+        app_data: &mut Self,
+        ext_handle: &ExtForeignToplevelHandleV1,
+        event: <ExtForeignToplevelHandleV1 as Proxy>::Event,
+        _data: &UserData,
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        use wayland_protocols::ext::foreign_toplevel_list::v1::client::ext_foreign_toplevel_handle_v1::Event;
+
+        let Some(toplevel) = app_data
+            .toplevels
+            .iter_mut()
+            .find(|t| &t.ext_handle == ext_handle)
+        else {
+            warn!("Unknown toplevel for ext_handle: {:?}", ext_handle.id());
+            return;
+        };
+
+        match event {
+            Event::Title { title } => toplevel.title = Some(title),
+            Event::AppId { app_id } => toplevel.app_id = Some(app_id),
+            Event::Identifier { identifier } => {
+                toplevel.ext_id = Some(identifier);
+            }
+            Event::Closed | Event::Done => {
+                // don't care. handled by cosmic specific protocol
+                trace!(target: EXT_TOPLEVEL_HANDLE_NAME, "ignore event: {event:?}");
+            }
+            _ => {
+                warn!(target: EXT_TOPLEVEL_HANDLE_NAME, "not implemented: handle event: {event:?}");
+            }
+        }
+    }
+}
+
 impl Dispatch<ZcosmicWorkspaceManagerV2, UserData> for AppData {
     fn event(
         _state: &mut Self,
@@ -411,22 +513,26 @@ impl Dispatch<WlOutput, UserData> for AppData {
 
 pub struct Toplevel {
     pub handle: ZcosmicToplevelHandleV1,
+    pub ext_handle: ExtForeignToplevelHandleV1,
     pub title: Option<String>,
     pub app_id: Option<String>,
     pub outputs: Vec<wl_output::WlOutput>,
     pub workspaces: Vec<ZcosmicWorkspaceHandleV2>,
     pub state: Vec<ToplevelState>,
+    pub ext_id: Option<String>,
 }
 
 impl Toplevel {
-    pub fn new(handle: ZcosmicToplevelHandleV1) -> Self {
+    pub fn new(handle: ZcosmicToplevelHandleV1, ext_handle: ExtForeignToplevelHandleV1) -> Self {
         Self {
             handle,
+            ext_handle,
             title: Default::default(),
             app_id: Default::default(),
             outputs: Default::default(),
             workspaces: Default::default(),
             state: Default::default(),
+            ext_id: None,
         }
     }
 }

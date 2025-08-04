@@ -9,3 +9,4 @@ cosmic-protocols = { version = "0.1.0", git = "https://github.com/pop-os/cosmic-
 log = "0.4.27"
 simple_logger = "5.0.0"
 wayland-client = "0.31.11"
+wayland-protocols = "0.32.9"

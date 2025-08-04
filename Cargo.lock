@@ -132,6 +132,7 @@ dependencies = [
  "log",
  "simple_logger",
  "wayland-client",
+ "wayland-protocols",
 ]
 
 [[package]]

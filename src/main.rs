@@ -37,7 +37,6 @@ fn main() {
         debug!("roundtrip done");
         count += 1;
     }
-
     match args.command {
         Command::Toplevels => toplevels(&app_data),
         Command::Outputs => outputs(&app_data),
@@ -79,6 +78,7 @@ fn toplevels(app_data: &AppData) {
     for toplevel in &app_data.toplevels {
         print_otpion(toplevel.title.as_ref(), "Title");
         print_otpion(toplevel.app_id.as_ref(), "AppId");
+        print_otpion(toplevel.ext_id.as_ref(), "Unique Identifier");
         if cfg!(debug_assertions) {
             println!("ObjectId: {}", toplevel.handle.id());
         }
