@@ -37,12 +37,11 @@ fn main() {
         debug!("roundtrip done");
         count += 1;
     }
+    debug!("finished {count} wayland event roundtrips");
     match args.command {
         Command::Toplevels => toplevels(&app_data),
         Command::Outputs => outputs(&app_data),
     }
-
-    assert_eq!(count, 2);
 }
 
 fn outputs(app_data: &AppData) {
