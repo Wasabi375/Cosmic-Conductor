@@ -11,7 +11,6 @@ use cosmic_protocols::{
         zcosmic_workspace_manager_v2::ZcosmicWorkspaceManagerV2,
     },
 };
-use log::{debug, error, info, warn};
 use wayland_client::{
     Connection, Dispatch, Proxy, QueueHandle, WEnum, event_created_child,
     protocol::{
@@ -19,6 +18,9 @@ use wayland_client::{
         wl_registry::{self, WlRegistry},
     },
 };
+
+#[allow(unused)]
+use log::{debug, error, info, warn};
 
 #[derive(Debug, Clone, Default)]
 pub struct UserData {}
@@ -109,7 +111,7 @@ impl Dispatch<WlRegistry, UserData> for AppData {
         qh: &QueueHandle<Self>,
     ) {
         use wl_registry::Event;
-        info!(target: "WlRegistry", "event: {event:?}");
+        debug!(target: "WlRegistry", "event: {event:?}");
         match event {
             Event::Global {
                 name,
@@ -136,12 +138,12 @@ impl Dispatch<WlRegistry, UserData> for AppData {
                     registry.bind::<WlOutput, UserData, _>(name, 4, qh, UserData::default());
                 }
                 _ => {
-                    if interface.contains("wl")
-                        || interface.contains("cosmic")
-                        || interface.contains("workspace")
-                    {
-                        warn!("unused wl/cosmic interface: {interface}");
-                    }
+                    //                     if interface.contains("wl")
+                    //                         || interface.contains("cosmic")
+                    //                         || interface.contains("workspace")
+                    //                     {
+                    //                         warn!("unused wl/cosmic interface: {interface}");
+                    //                     }
                     // we don't care about this interface
                 }
             },
@@ -149,13 +151,13 @@ impl Dispatch<WlRegistry, UserData> for AppData {
                 if let Some(proxy) = &state.toplevel_info
                     && proxy.name() == name
                 {
-                    info!("{} removed", CosmicTopLevelInfo::DISPLAY_NAME);
+                    debug!("{} removed", CosmicTopLevelInfo::DISPLAY_NAME);
                     state.toplevel_info = None;
                 }
                 if let Some(proxy) = &state.workspace_manager
                     && proxy.name() == name
                 {
-                    info!("{} removed", CosmicWorkspaceManager::DISPLAY_NAME);
+                    debug!("{} removed", CosmicWorkspaceManager::DISPLAY_NAME);
                     state.workspace_manager = None;
                 }
             }
@@ -177,7 +179,7 @@ impl Dispatch<ZcosmicToplevelInfoV1, UserData> for AppData {
         _qhandle: &QueueHandle<Self>,
     ) {
         use zcosmic_toplevel_info_v1::Event;
-        info!(target: CosmicTopLevelInfo::DISPLAY_NAME, "event: {event:?}");
+        debug!(target: CosmicTopLevelInfo::DISPLAY_NAME, "event: {event:?}");
 
         match event {
             Event::Toplevel { toplevel: handle } => {
@@ -212,7 +214,7 @@ impl Dispatch<ZcosmicToplevelHandleV1, UserData> for AppData {
         _qhandle: &QueueHandle<Self>,
     ) {
         use zcosmic_toplevel_handle_v1::Event;
-        info!(target: TOPLEVEL_HANDLE_DISPLAY_NAME, "handle event: {event:?}");
+        debug!(target: TOPLEVEL_HANDLE_DISPLAY_NAME, "handle event: {event:?}");
 
         let Some(toplevel) = app_data
             .toplevels
@@ -335,7 +337,6 @@ impl Dispatch<WlOutput, UserData> for AppData {
         _qhandle: &QueueHandle<Self>,
     ) {
         use wl_output::Event;
-        warn!(target: WL_OUTPUT_DISPLAY_NAME, "not implemented: handle event: {event:?}");
 
         let output = app_data.outputs.iter_mut().find(|o| &o.handle == handle);
 
