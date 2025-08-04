@@ -19,9 +19,16 @@ use wayland_client::{
         wl_registry::{self, WlRegistry},
     },
 };
-use wayland_protocols::ext::foreign_toplevel_list::v1::client::{
-    ext_foreign_toplevel_handle_v1::ExtForeignToplevelHandleV1,
-    ext_foreign_toplevel_list_v1::{self, ExtForeignToplevelListV1},
+use wayland_protocols::ext::{
+    foreign_toplevel_list::v1::client::{
+        ext_foreign_toplevel_handle_v1::ExtForeignToplevelHandleV1,
+        ext_foreign_toplevel_list_v1::{self, ExtForeignToplevelListV1},
+    },
+    workspace::v1::client::{
+        ext_workspace_group_handle_v1::ExtWorkspaceGroupHandleV1,
+        ext_workspace_handle_v1::ExtWorkspaceHandleV1,
+        ext_workspace_manager_v1::{self, ExtWorkspaceManagerV1},
+    },
 };
 
 #[allow(unused)]
@@ -43,6 +50,12 @@ pub const WL_OUTPUT_DISPLAY_NAME: &str = "Wl Output";
 pub const EXT_TOPLEVEL_LIST_INTERFACE: &str = "ext_foreign_toplevel_list_v1";
 pub const EXT_TOPLEVEL_LIST_NAME: &str = "Foreign toplevel list";
 pub const EXT_TOPLEVEL_HANDLE_NAME: &str = "Foreign toplevel handle";
+
+pub const EXT_WORKSPACE_MANAGER_INTERFACE: &str = "ext_workspace_manager_v1";
+pub const EXT_WORKSPACE_MANAGER_NAME: &str = "Workspace manager";
+pub const WORKSPACE_HANDLE_NAME: &str = "Workspace handle";
+pub const EXT_WORKSPACE_HANDLE_NAME: &str = "EXT Workspace handle";
+pub const EXT_WORKSPACE_GROUP_HANDLE_NAME: &str = "EXT Workspace group handle";
 
 impl CosmicTopLevelInfo {
     pub const INTERFACE: &str = "zcosmic_toplevel_info_v1";
@@ -107,7 +120,8 @@ pub struct AppData {
     pub workspace_manager: Option<CosmicWorkspaceManager>,
     pub outputs: Vec<Output>,
     pub toplevels: Vec<Toplevel>,
-    pub workspaces: Vec<(Vec<(ZcosmicWorkspaceHandleV2, Option<String>)>,)>,
+    pub workspace_groups: Vec<WorkspaceGroup>,
+    pub workspaces: Vec<Workspace>,
 }
 
 impl Dispatch<WlRegistry, UserData> for AppData {
@@ -120,7 +134,7 @@ impl Dispatch<WlRegistry, UserData> for AppData {
         qh: &QueueHandle<Self>,
     ) {
         use wl_registry::Event;
-        debug!(target: "WlRegistry", "event: {event:?}");
+        trace!(target: "WlRegistry", "event: {event:?}");
         match event {
             Event::Global {
                 name,
@@ -144,15 +158,27 @@ impl Dispatch<WlRegistry, UserData> for AppData {
                     ));
                 }
                 WL_OUTPUT_INTERFACE => {
-                    registry.bind::<WlOutput, UserData, _>(name, 4, qh, UserData::default());
+                    let proto =
+                        registry.bind::<WlOutput, UserData, _>(name, 4, qh, UserData::default());
+                    debug!("bind {proto:?}");
                 }
                 EXT_TOPLEVEL_LIST_INTERFACE => {
-                    registry.bind::<ExtForeignToplevelListV1, UserData, _>(
+                    let proto = registry.bind::<ExtForeignToplevelListV1, UserData, _>(
                         name,
                         1,
                         qh,
                         UserData::default(),
                     );
+                    debug!("bind {proto:?}");
+                }
+                EXT_WORKSPACE_MANAGER_INTERFACE => {
+                    let proto = registry.bind::<ExtWorkspaceManagerV1, UserData, _>(
+                        name,
+                        1,
+                        qh,
+                        UserData::default(),
+                    );
+                    debug!("bind {proto:?}");
                 }
                 _ => {
                     //                     if interface.contains("wl")
@@ -416,6 +442,87 @@ impl Dispatch<ExtForeignToplevelHandleV1, UserData> for AppData {
     }
 }
 
+impl Dispatch<ExtWorkspaceManagerV1, UserData> for AppData {
+    fn event(
+        app_data: &mut Self,
+        _proxy: &ExtWorkspaceManagerV1,
+        event: <ExtWorkspaceManagerV1 as Proxy>::Event,
+        _data: &UserData,
+        _conn: &Connection,
+        qhandle: &QueueHandle<Self>,
+    ) {
+        use ext_workspace_manager_v1::Event;
+        warn!(target: EXT_WORKSPACE_MANAGER_NAME, "not implemented: handle event: {event:?}");
+
+        match event {
+            Event::WorkspaceGroup { workspace_group } => app_data
+                .workspace_groups
+                .push(WorkspaceGroup::new(workspace_group)),
+            Event::Workspace {
+                workspace: ext_handle,
+            } => {
+                let Some(workspace_manager) = app_data.workspace_manager.as_ref() else {
+                    panic!(
+                        "missing {}({}) protocol",
+                        CosmicWorkspaceManager::DISPLAY_NAME,
+                        CosmicWorkspaceManager::INTERFACE
+                    );
+                };
+                let cosmic_handle = workspace_manager.manager.get_cosmic_workspace(
+                    &ext_handle,
+                    qhandle,
+                    UserData::default(),
+                );
+                app_data
+                    .workspaces
+                    .push(Workspace::new(cosmic_handle, ext_handle));
+            }
+            Event::Done | Event::Finished => {
+                trace!(target: EXT_WORKSPACE_MANAGER_NAME, "ignore event: {event:?}");
+                // we don't need these events
+            }
+            _ => {
+                warn!(target: EXT_WORKSPACE_MANAGER_NAME, "not implemented: handle event: {event:?}");
+            }
+        }
+    }
+
+    event_created_child!(
+        AppData,
+        ExtWorkspaceManagerV1,
+        [
+            ext_workspace_manager_v1::EVT_WORKSPACE_GROUP_OPCODE => (ExtWorkspaceGroupHandleV1, UserData::default()),
+            ext_workspace_manager_v1::EVT_WORKSPACE_OPCODE => (ExtWorkspaceHandleV1, UserData::default()),
+        ]
+    );
+}
+
+impl Dispatch<ExtWorkspaceGroupHandleV1, UserData> for AppData {
+    fn event(
+        state: &mut Self,
+        proxy: &ExtWorkspaceGroupHandleV1,
+        event: <ExtWorkspaceGroupHandleV1 as Proxy>::Event,
+        data: &UserData,
+        conn: &Connection,
+        qhandle: &QueueHandle<Self>,
+    ) {
+        warn!(target: EXT_WORKSPACE_GROUP_HANDLE_NAME, "not implemented: handle event: {event:?}");
+    }
+}
+
+impl Dispatch<ExtWorkspaceHandleV1, UserData> for AppData {
+    fn event(
+        state: &mut Self,
+        proxy: &ExtWorkspaceHandleV1,
+        event: <ExtWorkspaceHandleV1 as Proxy>::Event,
+        data: &UserData,
+        conn: &Connection,
+        qhandle: &QueueHandle<Self>,
+    ) {
+        warn!(target: EXT_WORKSPACE_HANDLE_NAME, "not implemented: handle event: {event:?}");
+    }
+}
+
 impl Dispatch<ZcosmicWorkspaceManagerV2, UserData> for AppData {
     fn event(
         _state: &mut Self,
@@ -426,6 +533,19 @@ impl Dispatch<ZcosmicWorkspaceManagerV2, UserData> for AppData {
         _qhandle: &QueueHandle<Self>,
     ) {
         warn!(target: CosmicWorkspaceManager::DISPLAY_NAME, "not implemented: handle event: {event:?}");
+    }
+}
+
+impl Dispatch<ZcosmicWorkspaceHandleV2, UserData> for AppData {
+    fn event(
+        app_data: &mut Self,
+        handle: &ZcosmicWorkspaceHandleV2,
+        event: <ZcosmicWorkspaceHandleV2 as Proxy>::Event,
+        _data: &UserData,
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
+    ) {
+        warn!(target: WORKSPACE_HANDLE_NAME, "not implemented: handle event: {event:?}");
     }
 }
 
@@ -634,6 +754,36 @@ impl TryFrom<u32> for ToplevelState {
             2 => Ok(ToplevelState::Activated),
             3 => Ok(ToplevelState::Fullscreen),
             _ => Err(()),
+        }
+    }
+}
+
+pub struct WorkspaceGroup {
+    handle: ExtWorkspaceGroupHandleV1,
+    outputs: Vec<WlOutput>,
+    workspaces: Vec<()>,
+}
+
+impl WorkspaceGroup {
+    pub fn new(handle: ExtWorkspaceGroupHandleV1) -> Self {
+        Self {
+            handle,
+            outputs: Vec::new(),
+            workspaces: Vec::new(),
+        }
+    }
+}
+
+pub struct Workspace {
+    ext_handle: ExtWorkspaceHandleV1,
+    handle: ZcosmicWorkspaceHandleV2,
+}
+
+impl Workspace {
+    pub fn new(cosmic_handle: ZcosmicWorkspaceHandleV2, ext_handle: ExtWorkspaceHandleV1) -> Self {
+        Self {
+            ext_handle,
+            handle: cosmic_handle,
         }
     }
 }
