@@ -41,7 +41,40 @@ fn main() {
     match args.command {
         Command::Toplevels => toplevels(&app_data),
         Command::Outputs => outputs(&app_data),
+        Command::WorkspaceGroups => workspace_groups(&app_data),
+        Command::Workspaces => workspaces(&app_data),
     }
+}
+
+fn workspace_groups(app_data: &AppData) {
+    println!("Workspace Groups:");
+    for wg in &app_data.workspace_groups {
+        print!("Display: ");
+        let mut first = true;
+        for output in &wg.outputs {
+            if first {
+                first = false;
+            } else {
+                print!(", ");
+            }
+            if let Some(output) = app_data.outputs.iter().find(|o| &o.handle == output) {
+                print!("{}", output.display_name());
+            } else {
+                print!("unknown");
+            }
+        }
+        if wg.outputs.is_empty() {
+            print!("none");
+        }
+        println!();
+        println!("workspace count: {}", wg.workspaces.len());
+        println!("can create workspace: {}", wg.can_create_workspace);
+    }
+}
+
+fn workspaces(app_data: &AppData) {
+    let _ = app_data;
+    println!("not implemented");
 }
 
 fn outputs(app_data: &AppData) {

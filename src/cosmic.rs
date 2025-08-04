@@ -25,7 +25,7 @@ use wayland_protocols::ext::{
         ext_foreign_toplevel_list_v1::{self, ExtForeignToplevelListV1},
     },
     workspace::v1::client::{
-        ext_workspace_group_handle_v1::ExtWorkspaceGroupHandleV1,
+        ext_workspace_group_handle_v1::{self, ExtWorkspaceGroupHandleV1},
         ext_workspace_handle_v1::ExtWorkspaceHandleV1,
         ext_workspace_manager_v1::{self, ExtWorkspaceManagerV1},
     },
@@ -499,25 +499,67 @@ impl Dispatch<ExtWorkspaceManagerV1, UserData> for AppData {
 
 impl Dispatch<ExtWorkspaceGroupHandleV1, UserData> for AppData {
     fn event(
-        state: &mut Self,
-        proxy: &ExtWorkspaceGroupHandleV1,
+        app_data: &mut Self,
+        handle: &ExtWorkspaceGroupHandleV1,
         event: <ExtWorkspaceGroupHandleV1 as Proxy>::Event,
-        data: &UserData,
-        conn: &Connection,
-        qhandle: &QueueHandle<Self>,
+        _data: &UserData,
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
     ) {
-        warn!(target: EXT_WORKSPACE_GROUP_HANDLE_NAME, "not implemented: handle event: {event:?}");
+        use wayland_protocols::ext::workspace::v1::client::ext_workspace_group_handle_v1::Event;
+
+        trace!(target: EXT_WORKSPACE_GROUP_HANDLE_NAME, "handle event: {event:?}");
+
+        let Some(group) = app_data
+            .workspace_groups
+            .iter_mut()
+            .find(|g| &g.handle == handle)
+        else {
+            warn!("unknown workspace group: {:?}", handle.id());
+            return;
+        };
+
+        match event {
+            Event::Capabilities { capabilities } => {
+                group.can_create_workspace = capabilities
+                    .into_result()
+                    .map(|cap| {
+                        cap.contains(
+                            ext_workspace_group_handle_v1::GroupCapabilities::CreateWorkspace,
+                        )
+                    })
+                    .unwrap_or(false);
+            }
+            Event::OutputEnter { output } => {
+                group.outputs.push(output);
+            }
+            Event::OutputLeave { output } => {
+                if let Some(index) = group.outputs.iter().position(|o| o == &output) {
+                    group.outputs.remove(index);
+                }
+            }
+            Event::WorkspaceEnter { workspace } => group.workspaces.push(workspace),
+            Event::WorkspaceLeave { workspace } => {
+                if let Some(index) = group.workspaces.iter().position(|w| w == &workspace) {
+                    group.workspaces.remove(index);
+                }
+            }
+            Event::Removed => todo!(),
+            _ => {
+                warn!(target: EXT_WORKSPACE_GROUP_HANDLE_NAME, "not implemented: handle event: {event:?}")
+            }
+        }
     }
 }
 
 impl Dispatch<ExtWorkspaceHandleV1, UserData> for AppData {
     fn event(
-        state: &mut Self,
-        proxy: &ExtWorkspaceHandleV1,
+        app_data: &mut Self,
+        ext_handle: &ExtWorkspaceHandleV1,
         event: <ExtWorkspaceHandleV1 as Proxy>::Event,
-        data: &UserData,
-        conn: &Connection,
-        qhandle: &QueueHandle<Self>,
+        _data: &UserData,
+        _conn: &Connection,
+        _qhandle: &QueueHandle<Self>,
     ) {
         warn!(target: EXT_WORKSPACE_HANDLE_NAME, "not implemented: handle event: {event:?}");
     }
@@ -560,6 +602,7 @@ impl Dispatch<WlOutput, UserData> for AppData {
     ) {
         use wl_output::Event;
 
+        trace!(target: "WlOutput", "event: {event:?}");
         let output = app_data.outputs.iter_mut().find(|o| &o.handle == handle);
 
         match event {
@@ -702,6 +745,14 @@ impl Output {
     pub fn current_mode(&self) -> Option<&OutputMode> {
         self.modes.iter().find(|m| m.current)
     }
+
+    pub fn display_name(&self) -> String {
+        if let Some(name) = &self.name {
+            name.clone()
+        } else {
+            format!("{}+{}", self.make, self.model)
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -759,9 +810,10 @@ impl TryFrom<u32> for ToplevelState {
 }
 
 pub struct WorkspaceGroup {
-    handle: ExtWorkspaceGroupHandleV1,
-    outputs: Vec<WlOutput>,
-    workspaces: Vec<()>,
+    pub handle: ExtWorkspaceGroupHandleV1,
+    pub outputs: Vec<WlOutput>,
+    pub workspaces: Vec<ExtWorkspaceHandleV1>,
+    pub can_create_workspace: bool,
 }
 
 impl WorkspaceGroup {
@@ -770,6 +822,7 @@ impl WorkspaceGroup {
             handle,
             outputs: Vec::new(),
             workspaces: Vec::new(),
+            can_create_workspace: false,
         }
     }
 }
