@@ -25,5 +25,6 @@ pub enum Command {
     WorkspaceGroups,
 
     /// List all workspaces
+    #[clap(alias = "w")]
     Workspaces,
 }

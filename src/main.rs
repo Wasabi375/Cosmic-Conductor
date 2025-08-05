@@ -9,12 +9,13 @@ use cosmic_client_toolkit::{
         output::{OutputInfo, OutputState},
         registry::RegistryState,
     },
-    toplevel_info::ToplevelInfoState,
-    workspace::WorkspaceState,
+    toplevel_info::{ToplevelInfo, ToplevelInfoState},
+    workspace::{Workspace, WorkspaceGroup, WorkspaceState},
 };
+use cosmic_protocols::workspace::v2::client::zcosmic_workspace_handle_v2::TilingState;
 use log::{LevelFilter, debug, trace};
 use simple_logger::SimpleLogger;
-use wayland_client::{Connection, globals::registry_queue_init};
+use wayland_client::{Connection, globals::registry_queue_init, protocol::wl_output::WlOutput};
 use wayland_protocols::ext::workspace::v1::client::ext_workspace_group_handle_v1::GroupCapabilities;
 
 use std::{cmp::min, thread, time::Duration};
@@ -48,10 +49,8 @@ fn main() {
         output_count: 0,
     };
 
-    let check_done: &dyn Fn(&AppData) -> bool = match &args.command {
-        Command::Toplevels => &|app_data| app_data.toplevl_done,
-        Command::Outputs => &|app_data| app_data.output_count > 0,
-        Command::WorkspaceGroups | Command::Workspaces => &|app_data| app_data.workspace_done,
+    let check_done = |app_data: &AppData| {
+        app_data.toplevl_done && app_data.output_count > 0 && app_data.workspace_done
     };
 
     let mut count = 1u64;
@@ -85,24 +84,7 @@ fn output_display_name(output: &OutputInfo) -> String {
 fn workspace_groups(app_data: &AppData) {
     println!("Workspace Groups:");
     for wg in app_data.workspace_state.workspace_groups() {
-        print!("Display: ");
-        let mut first = true;
-        for output in &wg.outputs {
-            if first {
-                first = false;
-            } else {
-                print!(", ");
-            }
-            if let Some(output) = app_data.output_state.info(output) {
-                print!("{}", output_display_name(&output));
-            } else {
-                print!("unknown");
-            }
-        }
-        if wg.outputs.is_empty() {
-            print!("none");
-        }
-        println!();
+        print_displays(app_data, &wg.outputs);
         println!("workspace count: {}", wg.workspaces.len());
         println!(
             "can create workspace: {}",
@@ -112,9 +94,70 @@ fn workspace_groups(app_data: &AppData) {
     }
 }
 
+fn print_displays<'a, O: IntoIterator<Item = &'a WlOutput>>(app_data: &AppData, outputs: O) {
+    print!("Display: ");
+    let mut first = true;
+    for output in outputs {
+        if first {
+            first = false;
+        } else {
+            print!(", ");
+        }
+        if let Some(output) = app_data.output_state.info(output) {
+            print!("{}", output_display_name(&output));
+        } else {
+            print!("unknown");
+        }
+    }
+    if first {
+        print!("none");
+    }
+    println!();
+}
+
 fn workspaces(app_data: &AppData) {
     let _ = app_data;
-    println!("not implemented");
+    println!("Workspaces:");
+    for workspace in app_data.workspace_state.workspaces() {
+        println!("Name: {}", workspace.name);
+        print_otpion(workspace.id.as_ref(), "id");
+        let displays =
+            get_groups_for_workspace(workspace, app_data).flat_map(|wg| wg.outputs.iter());
+        print_displays(app_data, displays);
+        println!("Tiling: {}", is_workspace_tiling(workspace));
+        println!(
+            "Toplevel count: {}",
+            workspace_toplevels(workspace, app_data).count()
+        );
+        println!();
+    }
+}
+
+fn is_workspace_tiling(workspace: &Workspace) -> bool {
+    match workspace.tiling.map(|s| s.into_result().ok()).flatten() {
+        Some(TilingState::TilingEnabled) => true,
+        Some(_) | None => false,
+    }
+}
+
+fn get_groups_for_workspace<'a>(
+    workspace: &Workspace,
+    app_data: &'a AppData,
+) -> impl Iterator<Item = &'a WorkspaceGroup> {
+    app_data
+        .workspace_state
+        .workspace_groups()
+        .filter(|wg| wg.workspaces.contains(&workspace.handle))
+}
+
+fn workspace_toplevels<'a>(
+    workspace: &Workspace,
+    app_data: &'a AppData,
+) -> impl Iterator<Item = &'a ToplevelInfo> {
+    app_data
+        .toplevel_info_state
+        .toplevels()
+        .filter(|t| t.workspace.contains(&workspace.handle))
 }
 
 fn outputs(app_data: &AppData) {
@@ -152,6 +195,13 @@ fn toplevels(app_data: &AppData) {
         println!("AppId: {}", toplevel.app_id);
         println!("Unique Identifier: {}", toplevel.identifier);
         println!("State: {:?}", toplevel.state);
+        let workspaces: Vec<_> = toplevel
+            .workspace
+            .iter()
+            .filter_map(|w| app_data.workspace_state.workspace_info(w))
+            .map(|w| &w.name)
+            .collect();
+        println!("Workspaces: {:?}", workspaces);
         println!();
     }
 }
