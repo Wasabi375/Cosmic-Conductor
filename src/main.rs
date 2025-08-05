@@ -3,10 +3,20 @@ mod cosmic;
 
 use args::{Arguments, Command};
 use clap::Parser;
+
 use cosmic::AppData;
+use cosmic_client_toolkit::{
+    sctk::{
+        output::{OutputInfo, OutputState},
+        registry::RegistryState,
+    },
+    toplevel_info::ToplevelInfoState,
+    workspace::WorkspaceState,
+};
 use log::{LevelFilter, debug};
 use simple_logger::SimpleLogger;
-use wayland_client::{Connection, EventQueue, Proxy, protocol::wl_display::WlDisplay};
+use wayland_client::{Connection, globals::registry_queue_init};
+use wayland_protocols::ext::workspace::v1::client::ext_workspace_group_handle_v1::GroupCapabilities;
 
 fn main() {
     SimpleLogger::new()
@@ -22,22 +32,33 @@ fn main() {
     let args = Arguments::parse();
 
     let connection: Connection = Connection::connect_to_env().unwrap();
-    let display: WlDisplay = connection.display();
-    let mut event_queue: EventQueue<AppData> = connection.new_event_queue();
+
+    let (globals, mut event_queue) = registry_queue_init(&connection).unwrap();
     let qh = event_queue.handle();
-    let _registry = display.get_registry(&qh, cosmic::UserData {});
+    let registry_state = RegistryState::new(&globals);
 
-    let mut app_data = AppData::default();
+    let mut app_data = AppData {
+        output_state: OutputState::new(&globals, &qh),
+        workspace_state: WorkspaceState::new(&registry_state, &qh),
+        toplevel_info_state: ToplevelInfoState::new(&registry_state, &qh),
+        registry_state,
+        toplevl_done: false,
+        workspace_done: false,
+        output_count: 0,
+    };
 
-    // roundtrip until we have a roundtrip with 0 events
-    // I should replace this with some smart system that roundtrips until I
-    // recieve the "done" events for the infos I care about
-    let mut count = 0;
-    while event_queue.roundtrip(&mut app_data).unwrap() != 0 {
-        debug!("roundtrip done");
+    let check_done: &dyn Fn(&AppData) -> bool = match &args.command {
+        Command::Toplevels => &|app_data| app_data.toplevl_done,
+        Command::Outputs => &|app_data| app_data.output_count > 0,
+        Command::WorkspaceGroups | Command::Workspaces => &|app_data| app_data.workspace_done,
+    };
+
+    let mut count = 1;
+    while !check_done(&app_data) && event_queue.roundtrip(&mut app_data).unwrap() == 0 {
         count += 1;
     }
     debug!("finished {count} wayland event roundtrips");
+
     match args.command {
         Command::Toplevels => toplevels(&app_data),
         Command::Outputs => outputs(&app_data),
@@ -46,9 +67,17 @@ fn main() {
     }
 }
 
+fn output_display_name(output: &OutputInfo) -> String {
+    if let Some(name) = &output.name {
+        name.clone()
+    } else {
+        format!("{}+{}", output.make, output.model)
+    }
+}
+
 fn workspace_groups(app_data: &AppData) {
     println!("Workspace Groups:");
-    for wg in &app_data.workspace_groups {
+    for wg in app_data.workspace_state.workspace_groups() {
         print!("Display: ");
         let mut first = true;
         for output in &wg.outputs {
@@ -57,8 +86,8 @@ fn workspace_groups(app_data: &AppData) {
             } else {
                 print!(", ");
             }
-            if let Some(output) = app_data.outputs.iter().find(|o| &o.handle == output) {
-                print!("{}", output.display_name());
+            if let Some(output) = app_data.output_state.info(output) {
+                print!("{}", output_display_name(&output));
             } else {
                 print!("unknown");
             }
@@ -68,7 +97,11 @@ fn workspace_groups(app_data: &AppData) {
         }
         println!();
         println!("workspace count: {}", wg.workspaces.len());
-        println!("can create workspace: {}", wg.can_create_workspace);
+        println!(
+            "can create workspace: {}",
+            wg.capabilities.contains(GroupCapabilities::CreateWorkspace)
+        );
+        println!();
     }
 }
 
@@ -79,27 +112,27 @@ fn workspaces(app_data: &AppData) {
 
 fn outputs(app_data: &AppData) {
     println!("Outputs:");
-    for output in &app_data.outputs {
+    for output in app_data
+        .output_state
+        .outputs()
+        .filter_map(|o| app_data.output_state.info(&o))
+    {
         print_otpion(output.name.as_ref(), "Name");
         print_otpion(output.description.as_ref(), "Description");
 
-        if cfg!(debug_assertions) {
-            println!("ObjectId: {}", output.handle.id());
-        }
-
-        if let Some(mode) = output.current_mode() {
-            println!("width: {}", mode.width);
-            println!("height: {}", mode.height);
-            println!("refresh: {}", mode.refresh);
+        if let Some(mode) = output.modes.iter().find(|m| m.current) {
+            println!("width: {}", mode.dimensions.0);
+            println!("height: {}", mode.dimensions.1);
+            println!("refresh: {}", mode.refresh_rate);
             println!("preferred: {}", mode.preferred);
         }
 
-        println!("x: {}", output.x);
-        println!("y: {}", output.y);
+        println!("x: {}", output.location.0);
+        println!("y: {}", output.location.1);
         println!("Make: {}", output.make);
         println!("Model: {}", output.model);
-        println!("phys width: {}", output.phys_width);
-        println!("phys height: {}", output.phys_height);
+        println!("phys width: {}", output.physical_size.0);
+        println!("phys height: {}", output.physical_size.1);
 
         println!();
     }
@@ -107,13 +140,10 @@ fn outputs(app_data: &AppData) {
 
 fn toplevels(app_data: &AppData) {
     println!("Toplevels:");
-    for toplevel in &app_data.toplevels {
-        print_otpion(toplevel.title.as_ref(), "Title");
-        print_otpion(toplevel.app_id.as_ref(), "AppId");
-        print_otpion(toplevel.ext_id.as_ref(), "Unique Identifier");
-        if cfg!(debug_assertions) {
-            println!("ObjectId: {}", toplevel.handle.id());
-        }
+    for toplevel in app_data.toplevel_info_state.toplevels() {
+        println!("Title: {}", toplevel.title);
+        println!("AppId: {}", toplevel.app_id);
+        println!("Unique Identifier: {}", toplevel.identifier);
         println!("State: {:?}", toplevel.state);
         println!();
     }

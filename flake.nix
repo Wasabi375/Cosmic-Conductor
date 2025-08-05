@@ -39,12 +39,22 @@
       in
       {
         devShells.default = with pkgs; mkShell {
+          LD_LIBRARY_PATH = lib.makeLibraryPath [
+            libGL
+            libxkbcommon
+            wayland
+          ];
+ 
           buildInputs = [
             openssl
             pkg-config
             rustToolchain
             cargo-deny
             cargo-edit
+          ];
+
+          packages = [
+            libxkbcommon
           ];
 
           shellHook = ''
