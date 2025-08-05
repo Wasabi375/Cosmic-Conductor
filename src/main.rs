@@ -3,7 +3,6 @@ mod cosmic;
 
 use args::{Arguments, Command};
 use clap::Parser;
-
 use cosmic::AppData;
 use cosmic_client_toolkit::{
     sctk::{
@@ -13,10 +12,12 @@ use cosmic_client_toolkit::{
     toplevel_info::ToplevelInfoState,
     workspace::WorkspaceState,
 };
-use log::{LevelFilter, debug};
+use log::{LevelFilter, debug, trace};
 use simple_logger::SimpleLogger;
 use wayland_client::{Connection, globals::registry_queue_init};
 use wayland_protocols::ext::workspace::v1::client::ext_workspace_group_handle_v1::GroupCapabilities;
+
+use std::{cmp::min, thread, time::Duration};
 
 fn main() {
     SimpleLogger::new()
@@ -53,8 +54,14 @@ fn main() {
         Command::WorkspaceGroups | Command::Workspaces => &|app_data| app_data.workspace_done,
     };
 
-    let mut count = 1;
-    while !check_done(&app_data) && event_queue.roundtrip(&mut app_data).unwrap() == 0 {
+    let mut count = 1u64;
+    let mut delay = Duration::from_millis(20);
+    while !check_done(&app_data) {
+        if event_queue.roundtrip(&mut app_data).unwrap() == 0 {
+            thread::sleep(delay);
+            trace!("roundtrip sleep: {:?}", delay);
+            delay = min(delay * 2, Duration::from_millis(200));
+        }
         count += 1;
     }
     debug!("finished {count} wayland event roundtrips");
