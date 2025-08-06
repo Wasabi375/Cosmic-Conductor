@@ -26,5 +26,20 @@ pub enum Command {
 
     /// List all workspaces
     #[clap(alias = "w")]
-    Workspaces,
+    Workspaces {
+        #[command(subcommand)]
+        subcommand: Option<WorkspaceSubcommand>,
+    },
+}
+
+#[derive(Subcommand, Debug, Default)]
+pub enum WorkspaceSubcommand {
+    /// Move the workspace to the n-th position within it's group
+    #[command()]
+    MoveToPos { workspace: String, position: u8 },
+
+    /// List all workspaces
+    #[command()]
+    #[default]
+    List,
 }
