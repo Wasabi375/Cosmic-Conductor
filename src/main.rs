@@ -72,8 +72,17 @@ fn main() {
             WorkspaceSubcommand::MoveToPos {
                 workspace,
                 position,
-            } => workspace::move_to(&app_data, workspace, position.into()),
-            _ => todo!(),
+            } => workspace::move_to(&app_data, workspace, position.into(), None),
+            WorkspaceSubcommand::MoveToDisplay {
+                workspace,
+                target_display,
+                position,
+            } => workspace::move_to(
+                &app_data,
+                workspace,
+                position.map(Into::into).unwrap_or(usize::MAX),
+                Some(&target_display),
+            ),
         },
     }
     event_queue.flush().unwrap();

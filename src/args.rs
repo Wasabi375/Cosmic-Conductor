@@ -43,6 +43,19 @@ pub enum WorkspaceSubcommand {
         position: u8,
     },
 
+    /// Move the workspace to the specified display
+    MoveToDisplay {
+        #[command(flatten)]
+        workspace: WorkspaceIdent,
+
+        /// the target display
+        target_display: String,
+        /// position on the display
+        ///
+        /// Moved to the last position if left empty
+        position: Option<u8>,
+    },
+
     /// List all workspaces
     #[command()]
     List {

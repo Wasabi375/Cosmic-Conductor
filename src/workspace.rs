@@ -178,25 +178,61 @@ pub fn get_workspace<'a>(
     }
 }
 
-pub fn move_to(app_data: &AppData, workspace: WorkspaceIdent, position: usize) {
+/// Move the workspace to position and display
+///
+/// # Arguments
+///
+/// * `target_position` is counted starting at 1.
+/// * if the `target_display` is `None` the workspace is moved within it's worksapce group
+pub fn move_to(
+    app_data: &AppData,
+    workspace: WorkspaceIdent,
+    target_position: usize,
+    target_display: Option<&str>,
+) {
     let Ok(workspace_manager) = app_data.workspace_state.workspace_manager().get() else {
         warn!("could not get acccess to workspace manager");
         return;
     };
 
-    let Some((group, current_pos, workspace)) = get_workspace(app_data, &workspace) else {
+    let Some((orig_group, current_pos, workspace)) = get_workspace(app_data, &workspace) else {
         return;
     };
 
-    let position = if position >= dbg!(group.workspaces.len()) {
+    let group = if let Some(target_display) = target_display {
+        let Some(group) = app_data.workspace_state.workspace_groups().find(|group| {
+            group
+                .outputs
+                .iter()
+                .filter_map(|o| app_data.output_state.info(o))
+                .any(|o| &output::display_name(&o) == target_display)
+        }) else {
+            error!("Unknonw display: {}", target_display);
+            return;
+        };
+        group
+    } else {
+        orig_group
+    };
+
+    let position = if target_position == 0 {
+        warn!("position should never be 0. Workspaces are counted starting at 1");
+        0
+    } else {
+        target_position - 1
+    };
+
+    let position = if position >= group.workspaces.len() {
         let real_pos = group.workspaces.len() - 1;
-        warn!("{position} to large. Workspace will be moved to the end at {real_pos}");
+        if position != usize::MAX - 1 {
+            warn!("{position} to large. Workspace will be moved to the end at {real_pos}");
+        }
         real_pos
     } else {
         position
     };
 
-    if dbg!(current_pos) == position {
+    if current_pos == position && orig_group.handle.id() == group.handle.id() {
         warn!(
             "workspace {} already at position {position}",
             workspace.name
