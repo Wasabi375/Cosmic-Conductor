@@ -71,10 +71,12 @@ fn main() {
             WorkspaceSubcommand::List => workspace::list(&app_data),
             WorkspaceSubcommand::MoveToPos {
                 workspace,
+                display,
                 position,
-            } => workspace::move_to(workspace, position),
+            } => workspace::move_to(&app_data, workspace, display, position.into()),
         },
     }
+    event_queue.flush().unwrap();
 }
 
 pub fn print_otpion<D: std::fmt::Display>(value: Option<D>, info: &str) {

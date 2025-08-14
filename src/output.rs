@@ -3,7 +3,7 @@ use wayland_client::protocol::wl_output::WlOutput;
 
 use crate::{cosmic::AppData, print_otpion};
 
-pub fn output_display_name(output: &OutputInfo) -> String {
+pub fn display_name(output: &OutputInfo) -> String {
     if let Some(name) = &output.name {
         name.clone()
     } else {
@@ -21,7 +21,7 @@ pub fn print_displays<'a, O: IntoIterator<Item = &'a WlOutput>>(app_data: &AppDa
             print!(", ");
         }
         if let Some(output) = app_data.output_state.info(output) {
-            print!("{}", output_display_name(&output));
+            print!("{}", display_name(&output));
         } else {
             print!("unknown");
         }

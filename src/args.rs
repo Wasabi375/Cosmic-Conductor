@@ -36,7 +36,14 @@ pub enum Command {
 pub enum WorkspaceSubcommand {
     /// Move the workspace to the n-th position within it's group
     #[command()]
-    MoveToPos { workspace: String, position: u8 },
+    MoveToPos {
+        /// Name of the workspace to move
+        workspace: String,
+        /// The display of the workspace
+        display: String,
+        /// The position to move to
+        position: u8,
+    },
 
     /// List all workspaces
     #[command()]
