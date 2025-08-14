@@ -32,7 +32,7 @@ pub enum Command {
     },
 }
 
-#[derive(Subcommand, Debug, Default)]
+#[derive(Subcommand, Debug)]
 pub enum WorkspaceSubcommand {
     /// Move the workspace to the n-th position within it's group
     #[command()]
@@ -45,8 +45,19 @@ pub enum WorkspaceSubcommand {
 
     /// List all workspaces
     #[command()]
-    #[default]
-    List,
+    List {
+        /// print capabilities
+        #[arg(short, long)]
+        capabilities: bool,
+    },
+}
+
+impl Default for WorkspaceSubcommand {
+    fn default() -> Self {
+        Self::List {
+            capabilities: false,
+        }
+    }
 }
 
 #[derive(Args, Debug)]

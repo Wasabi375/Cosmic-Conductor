@@ -9,10 +9,13 @@ use cosmic_client_toolkit::{
     toplevel_info::ToplevelInfo,
     workspace::{Workspace, WorkspaceGroup},
 };
-use cosmic_protocols::workspace::v2::client::zcosmic_workspace_handle_v2::TilingState;
+use cosmic_protocols::workspace::v2::client::zcosmic_workspace_handle_v2::{
+    TilingState, WorkspaceCapabilities,
+};
 use log::{error, warn};
 use wayland_client::Proxy;
 use wayland_protocols::ext::workspace::v1::client::ext_workspace_group_handle_v1::GroupCapabilities;
+use wayland_protocols::ext::workspace::v1::client::ext_workspace_handle_v1::WorkspaceCapabilities as ExtWorkspaceCapabilities;
 
 pub fn list_groups(app_data: &AppData) {
     println!("Workspace Groups:");
@@ -27,7 +30,7 @@ pub fn list_groups(app_data: &AppData) {
     }
 }
 
-pub fn list(app_data: &AppData) {
+pub fn list(app_data: &AppData, print_capabilities: bool) {
     let _ = app_data;
     println!("Workspaces:");
     for workspace in app_data.workspace_state.workspaces() {
@@ -46,6 +49,58 @@ pub fn list(app_data: &AppData) {
             "Toplevel count: {}",
             workspace_toplevels(workspace, app_data).count()
         );
+        if print_capabilities {
+            println!("Capabilities:");
+            if workspace
+                .cosmic_capabilities
+                .contains(WorkspaceCapabilities::Move)
+            {
+                println!("\tmove");
+            }
+            if workspace
+                .cosmic_capabilities
+                .contains(WorkspaceCapabilities::Pin)
+            {
+                println!("\tpin");
+            }
+            if workspace
+                .cosmic_capabilities
+                .contains(WorkspaceCapabilities::Rename)
+            {
+                println!("\trename");
+            }
+            if workspace
+                .cosmic_capabilities
+                .contains(WorkspaceCapabilities::Pin)
+            {
+                println!("\tset tiling");
+            }
+            if workspace
+                .capabilities
+                .contains(ExtWorkspaceCapabilities::Activate)
+            {
+                println!("\tactivate");
+            }
+            if workspace
+                .capabilities
+                .contains(ExtWorkspaceCapabilities::Assign)
+            {
+                println!("\tassign");
+            }
+            if workspace
+                .capabilities
+                .contains(ExtWorkspaceCapabilities::Deactivate)
+            {
+                println!("\tdeactivate");
+            }
+            if workspace
+                .capabilities
+                .contains(ExtWorkspaceCapabilities::Remove)
+            {
+                println!("\tremove");
+            }
+        }
+
         println!();
     }
 }

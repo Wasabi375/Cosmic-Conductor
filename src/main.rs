@@ -68,7 +68,7 @@ fn main() {
         Command::Outputs => output::list(&app_data),
         Command::WorkspaceGroups => workspace::list_groups(&app_data),
         Command::Workspaces { subcommand } => match subcommand.unwrap_or_default() {
-            WorkspaceSubcommand::List => workspace::list(&app_data),
+            WorkspaceSubcommand::List { capabilities } => workspace::list(&app_data, capabilities),
             WorkspaceSubcommand::MoveToPos {
                 workspace,
                 position,
