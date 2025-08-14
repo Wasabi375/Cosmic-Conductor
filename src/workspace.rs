@@ -1,4 +1,5 @@
 use crate::{
+    args::WorkspaceIdent,
     cosmic::AppData,
     output::{self, print_displays},
     print_otpion,
@@ -51,48 +52,84 @@ pub fn list(app_data: &AppData) {
 
 pub fn get_workspace<'a>(
     app_data: &'a AppData,
-    workspace: &str,
-    display: &str,
+    workspace: &WorkspaceIdent,
 ) -> Option<(&'a WorkspaceGroup, usize, &'a Workspace)> {
-    let Some(group) = app_data.workspace_state.workspace_groups().find(|group| {
-        group
-            .outputs
+    if let Some(display) = workspace.display.as_ref() {
+        let Some(group) = app_data.workspace_state.workspace_groups().find(|group| {
+            group
+                .outputs
+                .iter()
+                .filter_map(|o| app_data.output_state.info(o))
+                .any(|o| &output::display_name(&o) == display)
+        }) else {
+            error!("Unknonw display: {}", display);
+            return None;
+        };
+
+        let Some((workspace_pos, workspace)) = group
+            .workspaces
             .iter()
-            .filter_map(|o| app_data.output_state.info(o))
-            .any(|o| output::display_name(&o) == display)
-    }) else {
-        error!("Unknonw display: {display}");
-        return None;
-    };
+            .enumerate()
+            .filter_map(|(i, handle)| {
+                log::debug!("{i}: {handle:?}");
+                app_data
+                    .workspace_state
+                    .workspace_info(handle)
+                    .map(|info| (i, info))
+            })
+            .find(|(_, w)| w.name == workspace.name)
+        else {
+            error!(
+                "Workspace {} does not exist on display {display}",
+                workspace.name
+            );
+            return None;
+        };
 
-    let Some((workspace_pos, workspace)) = group
-        .workspaces
-        .iter()
-        .enumerate()
-        .filter_map(|(i, handle)| {
-            log::debug!("{i}: {handle:?}");
-            app_data
-                .workspace_state
-                .workspace_info(handle)
-                .map(|info| (i, info))
-        })
-        .find(|(_, w)| w.name == workspace)
-    else {
-        error!("Workspace {workspace} does not exist on display {display}");
-        return None;
-    };
+        Some((group, workspace_pos, workspace))
+    } else {
+        let mut candidate_workspaces = app_data
+            .workspace_state
+            .workspaces()
+            .filter(|w| w.name == workspace.name);
 
-    Some((group, workspace_pos, workspace))
+        let Some(workspace) = candidate_workspaces.next() else {
+            error!("Workspace {} does not exist", workspace.name);
+            return None;
+        };
+
+        if candidate_workspaces.next().is_some() {
+            error!(
+                "Found multiple workspaces with name {}. Specify display to narrow down selection",
+                workspace.name
+            );
+            return None;
+        }
+
+        let Some((workspace_pos, group)) = app_data
+            .workspace_state
+            .workspace_groups()
+            .enumerate()
+            .find(|(_, group)| group.workspaces.contains(&workspace.handle))
+        else {
+            error!(
+                "Found workspace {} but could not access it's group",
+                workspace.name
+            );
+            return None;
+        };
+
+        Some((group, workspace_pos, workspace))
+    }
 }
 
-pub fn move_to(app_data: &AppData, workspace_name: String, display: String, position: usize) {
+pub fn move_to(app_data: &AppData, workspace: WorkspaceIdent, position: usize) {
     let Ok(workspace_manager) = app_data.workspace_state.workspace_manager().get() else {
         warn!("could not get acccess to workspace manager");
         return;
     };
 
-    let Some((group, current_pos, workspace)) = get_workspace(app_data, &workspace_name, &display)
-    else {
+    let Some((group, current_pos, workspace)) = get_workspace(app_data, &workspace) else {
         return;
     };
 
@@ -105,7 +142,10 @@ pub fn move_to(app_data: &AppData, workspace_name: String, display: String, posi
     };
 
     if dbg!(current_pos) == position {
-        warn!("workspace {workspace_name} already at position {position}");
+        warn!(
+            "workspace {} already at position {position}",
+            workspace.name
+        );
         return;
     }
 
@@ -124,7 +164,10 @@ pub fn move_to(app_data: &AppData, workspace_name: String, display: String, posi
     const AXIS: u32 = 0;
 
     let Some(cosmic_handle) = workspace.cosmic_handle.as_ref() else {
-        error!("INTERNAL: No cosmic handle for workspace {workspace_name}");
+        error!(
+            "INTERNAL: No cosmic handle for workspace {}",
+            workspace.name
+        );
         return;
     };
 

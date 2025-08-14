@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -37,10 +37,8 @@ pub enum WorkspaceSubcommand {
     /// Move the workspace to the n-th position within it's group
     #[command()]
     MoveToPos {
-        /// Name of the workspace to move
-        workspace: String,
-        /// The display of the workspace
-        display: String,
+        #[command(flatten)]
+        workspace: WorkspaceIdent,
         /// The position to move to
         position: u8,
     },
@@ -49,4 +47,15 @@ pub enum WorkspaceSubcommand {
     #[command()]
     #[default]
     List,
+}
+
+#[derive(Args, Debug)]
+pub struct WorkspaceIdent {
+    /// the name of the workspace
+    pub name: String,
+    /// the display of the workspace
+    ///
+    /// this can be empty if the name is unique
+    #[arg(short, long)]
+    pub display: Option<String>,
 }

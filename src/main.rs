@@ -71,9 +71,9 @@ fn main() {
             WorkspaceSubcommand::List => workspace::list(&app_data),
             WorkspaceSubcommand::MoveToPos {
                 workspace,
-                display,
                 position,
-            } => workspace::move_to(&app_data, workspace, display, position.into()),
+            } => workspace::move_to(&app_data, workspace, position.into()),
+            _ => todo!(),
         },
     }
     event_queue.flush().unwrap();
