@@ -244,28 +244,6 @@ pub fn move_to(app_data: &AppData, workspace: WorkspaceIdent, position: usize) {
     workspace_manager.commit();
 }
 
-pub fn rename(app_data: &AppData, workspace: WorkspaceIdent, new_name: String) {
-    let Ok(workspace_manager) = app_data.workspace_state.workspace_manager().get() else {
-        warn!("could not get acccess to workspace manager");
-        return;
-    };
-
-    let Some((_, _, workspace)) = get_workspace(app_data, &workspace) else {
-        return;
-    };
-
-    let Some(handle) = workspace.cosmic_handle.as_ref() else {
-        error!(
-            "INTERNAL: No cosmic handle for workspace {}",
-            workspace.name
-        );
-        return;
-    };
-
-    handle.rename(new_name);
-    workspace_manager.commit();
-}
-
 pub fn is_workspace_tiling(workspace: &Workspace) -> bool {
     match workspace.tiling.map(|s| s.into_result().ok()).flatten() {
         Some(TilingState::TilingEnabled) => true,
