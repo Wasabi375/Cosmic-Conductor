@@ -73,7 +73,10 @@ fn main() {
                 workspace,
                 position,
             } => workspace::move_to(&app_data, workspace, position.into()),
-            _ => todo!(),
+            WorkspaceSubcommand::Rename {
+                workspace,
+                new_name,
+            } => workspace::rename(&app_data, workspace, new_name),
         },
     }
     event_queue.flush().unwrap();

@@ -43,6 +43,14 @@ pub enum WorkspaceSubcommand {
         position: u8,
     },
 
+    #[command()]
+    Rename {
+        #[command(flatten)]
+        workspace: WorkspaceIdent,
+        /// the new name for the workspace
+        new_name: String,
+    },
+
     /// List all workspaces
     #[command()]
     List {
