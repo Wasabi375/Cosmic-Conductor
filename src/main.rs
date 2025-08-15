@@ -83,6 +83,11 @@ fn main() {
                 position.map(Into::into).unwrap_or(usize::MAX),
                 Some(&target_display),
             ),
+            WorkspaceSubcommand::Pin { workspace } => workspace::pin(&app_data, workspace, true),
+            WorkspaceSubcommand::Unpin { workspace } => workspace::pin(&app_data, workspace, false),
+            WorkspaceSubcommand::Activate { workspace } => {
+                workspace::activate(&app_data, workspace)
+            }
         },
     }
     event_queue.flush().unwrap();

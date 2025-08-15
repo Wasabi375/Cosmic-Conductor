@@ -178,6 +178,46 @@ pub fn get_workspace<'a>(
     }
 }
 
+pub fn pin(app_data: &AppData, workspace: WorkspaceIdent, pin: bool) {
+    let Ok(workspace_manager) = app_data.workspace_state.workspace_manager().get() else {
+        warn!("could not get acccess to workspace manager");
+        return;
+    };
+
+    let Some((_, _, workspace)) = get_workspace(app_data, &workspace) else {
+        return;
+    };
+
+    let Some(cosmic_handle) = workspace.cosmic_handle.as_ref() else {
+        error!(
+            "INTERNAL: No cosmic handle for workspace {}",
+            workspace.name
+        );
+        return;
+    };
+
+    if pin {
+        cosmic_handle.pin();
+    } else {
+        cosmic_handle.unpin();
+    }
+    workspace_manager.commit();
+}
+
+pub fn activate(app_data: &AppData, workspace: WorkspaceIdent) {
+    let Ok(workspace_manager) = app_data.workspace_state.workspace_manager().get() else {
+        warn!("could not get acccess to workspace manager");
+        return;
+    };
+
+    let Some((_, _, workspace)) = get_workspace(app_data, &workspace) else {
+        return;
+    };
+
+    workspace.handle.activate();
+    workspace_manager.commit();
+}
+
 /// Move the workspace to position and display
 ///
 /// # Arguments

@@ -55,6 +55,18 @@ pub enum WorkspaceSubcommand {
         /// Moved to the last position if left empty
         position: Option<u8>,
     },
+    Pin {
+        #[command(flatten)]
+        workspace: WorkspaceIdent,
+    },
+    Unpin {
+        #[command(flatten)]
+        workspace: WorkspaceIdent,
+    },
+    Activate {
+        #[command(flatten)]
+        workspace: WorkspaceIdent,
+    },
 
     /// List all workspaces
     #[command()]
