@@ -13,7 +13,10 @@ pub enum Command {
     #[clap(alias = "t")]
     #[clap(alias = "wi")]
     #[clap(alias = "window")]
-    Toplevels,
+    Toplevels {
+        #[command(subcommand)]
+        subcommand: Option<ToplevelSubcommand>,
+    },
 
     /// List all monitors with their properties.
     #[clap(alias = "o")]
@@ -30,6 +33,23 @@ pub enum Command {
         #[command(subcommand)]
         subcommand: Option<WorkspaceSubcommand>,
     },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ToplevelSubcommand {
+    /// List all toplevels
+    #[command()]
+    List {
+        /// limit toplevels to display
+        #[arg(short, long)]
+        display: Option<String>,
+    },
+}
+
+impl Default for ToplevelSubcommand {
+    fn default() -> Self {
+        ToplevelSubcommand::List { display: None }
+    }
 }
 
 #[derive(Subcommand, Debug)]

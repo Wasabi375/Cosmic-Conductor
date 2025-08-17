@@ -4,7 +4,7 @@ mod output;
 mod toplevel;
 mod workspace;
 
-use args::{Arguments, Command, WorkspaceSubcommand};
+use args::{Arguments, Command, ToplevelSubcommand, WorkspaceSubcommand};
 use clap::Parser;
 use cosmic::AppData;
 use cosmic_client_toolkit::{
@@ -64,7 +64,9 @@ fn main() {
     debug!("finished {count} wayland event roundtrips");
 
     match args.command {
-        Command::Toplevels => toplevel::list(&app_data),
+        Command::Toplevels { subcommand } => match subcommand.unwrap_or_default() {
+            ToplevelSubcommand::List { display } => toplevel::list(&app_data, display),
+        },
         Command::Outputs => output::list(&app_data),
         Command::WorkspaceGroups => workspace::list_groups(&app_data),
         Command::Workspaces { subcommand } => match subcommand.unwrap_or_default() {

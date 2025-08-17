@@ -32,6 +32,19 @@ pub fn print_displays<'a, O: IntoIterator<Item = &'a WlOutput>>(app_data: &AppDa
     println!();
 }
 
+pub fn find(app_data: &AppData, display: &str) -> Option<(WlOutput, OutputInfo)> {
+    app_data
+        .output_state
+        .outputs()
+        .filter_map(|handle| {
+            app_data
+                .output_state
+                .info(&handle)
+                .map(|info| (handle, info))
+        })
+        .find(|(_, o)| &display_name(o) == display)
+}
+
 pub fn list(app_data: &AppData) {
     println!("Outputs:");
     for output in app_data

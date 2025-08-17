@@ -1,8 +1,22 @@
-use crate::cosmic::AppData;
+use crate::{cosmic::AppData, output};
 
-pub fn list(app_data: &AppData) {
+pub fn list(app_data: &AppData, display: Option<String>) {
+    let toplevels: Vec<_> = if let Some(display) = display.as_ref() {
+        let Some(display) = output::find(app_data, &display) else {
+            // TODO error
+            return;
+        };
+        app_data
+            .toplevel_info_state
+            .toplevels()
+            .filter(|t| t.output.contains(&display.0))
+            .collect()
+    } else {
+        app_data.toplevel_info_state.toplevels().collect()
+    };
+
     println!("Toplevels:");
-    for toplevel in app_data.toplevel_info_state.toplevels() {
+    for toplevel in toplevels {
         println!("Title: {}", toplevel.title);
         println!("AppId: {}", toplevel.app_id);
         println!("Unique Identifier: {}", toplevel.identifier);
@@ -14,6 +28,7 @@ pub fn list(app_data: &AppData) {
             .map(|w| &w.name)
             .collect();
         println!("Workspaces: {:?}", workspaces);
+        println!("output count: {}", toplevel.output.len());
         println!();
     }
 }
