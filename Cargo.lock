@@ -212,6 +212,7 @@ dependencies = [
  "cosmic-client-toolkit",
  "cosmic-protocols",
  "itertools",
+ "json_pretty",
  "log",
  "simple_logger",
  "wayland-client",
@@ -307,6 +308,12 @@ name = "itoa"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
+
+[[package]]
+name = "json_pretty"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9c9fe3f290d2cb8660e3e051352ea55a404788d213a106a33ec8802447c4a762"
 
 [[package]]
 name = "lazy_static"

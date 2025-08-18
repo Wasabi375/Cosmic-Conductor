@@ -7,7 +7,7 @@ use crate::{
     args::WorkspaceIdent,
     cosmic::AppData,
     output,
-    print::{Print, PrintList},
+    print::{DebugToDisplay, Print, PrintList},
     workspace::get_workspace,
 };
 
@@ -46,7 +46,8 @@ pub fn list<W: Write>(
         printer.field("Title", &toplevel.title)?;
         printer.field("AppId", &toplevel.app_id)?;
         printer.field("Unique Identifier", &toplevel.identifier)?;
-        printer.field_debug("State", &toplevel.state)?;
+        let states = toplevel.state.iter().map(|s| DebugToDisplay(s));
+        printer.inline_list("State", states)?;
         let workspace = toplevel
             .workspace
             .iter()

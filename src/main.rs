@@ -116,7 +116,12 @@ fn main() -> anyhow::Result<()> {
         args::OutputFormat::Json => {
             writeln!(stdout, "{json_buffer}")?;
         }
-        args::OutputFormat::JsonPretty => todo!("format json"),
+        args::OutputFormat::JsonPretty => {
+            // TODO not the most robust crate. I might want to use serde_json and serde_transcode
+            use json_pretty::PrettyFormatter;
+            let formatter = PrettyFormatter::from_string(&json_buffer);
+            writeln!(stdout, "{}", formatter.pretty())?;
+        }
         _ => {
             // nothing to do, format prints directly to stdout
         }

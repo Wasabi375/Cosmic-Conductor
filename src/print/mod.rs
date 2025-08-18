@@ -78,6 +78,7 @@ pub trait Print<W: Write>: SaveDrop {
         Ok(())
     }
 
+    #[allow(dead_code)]
     fn field_debug<D: Debug>(&mut self, name: &str, value: D) -> Result<()> {
         self.field(name, DebugToDisplay(value))
     }
@@ -232,7 +233,7 @@ impl<W: Write> Drop for ListPrinter<'_, W> {
     }
 }
 
-struct DebugToDisplay<T>(T);
+pub struct DebugToDisplay<T>(pub T);
 
 impl<T: Debug> Display for DebugToDisplay<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
