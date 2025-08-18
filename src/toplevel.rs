@@ -2,6 +2,7 @@ use std::io::Write;
 
 use anyhow::{Result, bail};
 use itertools::Itertools;
+use log::warn;
 
 use crate::{
     args::WorkspaceIdent,
@@ -16,6 +17,7 @@ pub fn list<W: Write>(
     printer: &mut impl Print<W>,
     workspace: Option<String>,
     display: Option<String>,
+    show_geometry: bool,
 ) -> Result<()> {
     let toplevels: Vec<_> = match (workspace, display) {
         (Some(workspace), display) => {
@@ -56,14 +58,27 @@ pub fn list<W: Write>(
             .exactly_one()
             .ok();
         printer.optional("workspace", workspace)?;
-        let output_name = toplevel
-            .output
-            .iter()
-            .filter_map(|handle| app_data.output_state.info(handle))
-            .map(|o| output::display_name(&o))
-            .exactly_one()
-            .ok();
+        let output = toplevel.output.iter().exactly_one().ok();
+        let output_name = output
+            .map(|handle| app_data.output_state.info(handle))
+            .flatten()
+            .map(|o| output::display_name(&o));
         printer.optional("output", output_name)?;
+        if show_geometry {
+            let Some(output) = output else {
+                warn!("no output found for toplevel: {}", toplevel.title);
+                continue;
+            };
+            let Some(geometry) = toplevel.geometry.get(output) else {
+                warn!("no geometry found for toplevel: {}", toplevel.title);
+                continue;
+            };
+            let mut printer = printer.sub_struct("Geometry")?;
+            printer.field("x", geometry.x)?;
+            printer.field("y", geometry.y)?;
+            printer.field("width", geometry.width)?;
+            printer.field("height", geometry.height)?;
+        }
     }
 
     Ok(())

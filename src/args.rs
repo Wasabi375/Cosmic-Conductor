@@ -62,6 +62,7 @@ pub enum Command {
 pub enum ToplevelSubcommand {
     /// List all toplevels
     #[command()]
+    #[clap(alias = "l")]
     List {
         /// limit toplevels to workspace
         ///
@@ -72,6 +73,10 @@ pub enum ToplevelSubcommand {
         /// limit toplevels to display
         #[arg(short, long)]
         display: Option<String>,
+
+        /// show the geometry of each toplevel
+        #[arg(short, long)]
+        geometry: bool,
     },
 }
 
@@ -80,6 +85,7 @@ impl Default for ToplevelSubcommand {
         ToplevelSubcommand::List {
             display: None,
             workspace: None,
+            geometry: false,
         }
     }
 }
@@ -87,7 +93,7 @@ impl Default for ToplevelSubcommand {
 #[derive(Subcommand, Debug)]
 pub enum WorkspaceSubcommand {
     /// Move the workspace to the n-th position within it's group
-    #[command()]
+    #[clap(alias = "mp")]
     MoveToPos {
         #[command(flatten)]
         workspace: WorkspaceIdent,
@@ -96,6 +102,7 @@ pub enum WorkspaceSubcommand {
     },
 
     /// Move the workspace to the specified display
+    #[clap(alias = "md")]
     MoveToDisplay {
         #[command(flatten)]
         workspace: WorkspaceIdent,
@@ -107,21 +114,24 @@ pub enum WorkspaceSubcommand {
         /// Moved to the last position if left empty
         position: Option<u8>,
     },
+    #[clap(alias = "p")]
     Pin {
         #[command(flatten)]
         workspace: WorkspaceIdent,
     },
+    #[clap(alias = "u")]
     Unpin {
         #[command(flatten)]
         workspace: WorkspaceIdent,
     },
+    #[clap(alias = "a")]
     Activate {
         #[command(flatten)]
         workspace: WorkspaceIdent,
     },
 
     /// List all workspaces
-    #[command()]
+    #[clap(alias = "l")]
     List {
         /// print capabilities
         #[arg(short, long)]

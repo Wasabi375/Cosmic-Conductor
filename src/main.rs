@@ -74,9 +74,11 @@ fn main() -> anyhow::Result<()> {
 
     match args.command {
         Command::Toplevels { subcommand } => match subcommand.unwrap_or_default() {
-            ToplevelSubcommand::List { display, workspace } => {
-                toplevel::list(&app_data, &mut printer, workspace, display)?
-            }
+            ToplevelSubcommand::List {
+                display,
+                workspace,
+                geometry,
+            } => toplevel::list(&app_data, &mut printer, workspace, display, geometry)?,
         },
         Command::Outputs => output::list(&app_data, &mut printer)?,
         Command::WorkspaceGroups => workspace::list_groups(&app_data, &mut printer)?,
