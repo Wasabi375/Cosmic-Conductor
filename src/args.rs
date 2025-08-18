@@ -1,10 +1,33 @@
-use clap::{Args, Parser, Subcommand};
+use std::fmt::Display;
+
+use clap::{Args, Parser, Subcommand, ValueEnum};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Arguments {
     #[command(subcommand)]
     pub command: Command,
+
+    #[arg(long, default_value_t)]
+    pub format: OutputFormat,
+}
+
+#[derive(ValueEnum, Debug, Default, Clone, Copy)]
+pub enum OutputFormat {
+    #[default]
+    Human,
+    Json,
+    JsonPretty,
+}
+impl Display for OutputFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            OutputFormat::Human => "human",
+            OutputFormat::Json => "json",
+            OutputFormat::JsonPretty => "json-pretty",
+        };
+        f.write_str(name)
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -40,6 +63,12 @@ pub enum ToplevelSubcommand {
     /// List all toplevels
     #[command()]
     List {
+        /// limit toplevels to workspace
+        ///
+        /// must be used with display if the name of the workspace is not unique
+        #[arg(short, long)]
+        workspace: Option<String>,
+
         /// limit toplevels to display
         #[arg(short, long)]
         display: Option<String>,
@@ -48,7 +77,10 @@ pub enum ToplevelSubcommand {
 
 impl Default for ToplevelSubcommand {
     fn default() -> Self {
-        ToplevelSubcommand::List { display: None }
+        ToplevelSubcommand::List {
+            display: None,
+            workspace: None,
+        }
     }
 }
 

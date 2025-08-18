@@ -1,6 +1,7 @@
 mod args;
 mod cosmic;
 mod output;
+mod print;
 mod toplevel;
 mod workspace;
 
@@ -18,7 +19,7 @@ use wayland_client::{Connection, globals::registry_queue_init};
 
 use std::{cmp::min, thread, time::Duration};
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     SimpleLogger::new()
         .with_level(if cfg!(debug_assertions) {
             LevelFilter::Debug
@@ -63,18 +64,29 @@ fn main() {
     }
     debug!("finished {count} wayland event roundtrips");
 
+    let mut stdout = std::io::stdout();
+    let mut printer = match args.format {
+        args::OutputFormat::Human => print::human::Printer::new(&mut stdout),
+        args::OutputFormat::Json => todo!(),
+        args::OutputFormat::JsonPretty => todo!(),
+    };
+
     match args.command {
         Command::Toplevels { subcommand } => match subcommand.unwrap_or_default() {
-            ToplevelSubcommand::List { display } => toplevel::list(&app_data, display),
+            ToplevelSubcommand::List { display, workspace } => {
+                toplevel::list(&app_data, &mut printer, workspace, display)?
+            }
         },
-        Command::Outputs => output::list(&app_data),
-        Command::WorkspaceGroups => workspace::list_groups(&app_data),
+        Command::Outputs => output::list(&app_data, &mut printer)?,
+        Command::WorkspaceGroups => workspace::list_groups(&app_data, &mut printer)?,
         Command::Workspaces { subcommand } => match subcommand.unwrap_or_default() {
-            WorkspaceSubcommand::List { capabilities } => workspace::list(&app_data, capabilities),
+            WorkspaceSubcommand::List { capabilities } => {
+                workspace::list(&app_data, &mut printer, capabilities)?
+            }
             WorkspaceSubcommand::MoveToPos {
                 workspace,
                 position,
-            } => workspace::move_to(&app_data, workspace, position.into(), None),
+            } => workspace::move_to(&app_data, workspace, position.into(), None)?,
             WorkspaceSubcommand::MoveToDisplay {
                 workspace,
                 target_display,
@@ -84,15 +96,19 @@ fn main() {
                 workspace,
                 position.map(Into::into).unwrap_or(usize::MAX),
                 Some(&target_display),
-            ),
-            WorkspaceSubcommand::Pin { workspace } => workspace::pin(&app_data, workspace, true),
-            WorkspaceSubcommand::Unpin { workspace } => workspace::pin(&app_data, workspace, false),
+            )?,
+            WorkspaceSubcommand::Pin { workspace } => workspace::pin(&app_data, workspace, true)?,
+            WorkspaceSubcommand::Unpin { workspace } => {
+                workspace::pin(&app_data, workspace, false)?
+            }
             WorkspaceSubcommand::Activate { workspace } => {
-                workspace::activate(&app_data, workspace)
+                workspace::activate(&app_data, workspace)?
             }
         },
     }
     event_queue.flush().unwrap();
+
+    Ok(())
 }
 
 pub fn print_otpion<D: std::fmt::Display>(value: Option<D>, info: &str) {

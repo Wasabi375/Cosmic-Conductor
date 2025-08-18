@@ -2,9 +2,11 @@ use crate::{
     args::WorkspaceIdent,
     cosmic::AppData,
     output::{self, print_displays},
+    print::{ListOptions, Print, PrintList},
     print_otpion,
 };
 
+use anyhow::{Context, Result, bail};
 use cosmic_client_toolkit::{
     toplevel_info::ToplevelInfo,
     workspace::{Workspace, WorkspaceGroup},
@@ -12,103 +14,100 @@ use cosmic_client_toolkit::{
 use cosmic_protocols::workspace::v2::client::zcosmic_workspace_handle_v2::{
     TilingState, WorkspaceCapabilities,
 };
-use log::{error, warn};
+use log::warn;
 use wayland_client::Proxy;
 use wayland_protocols::ext::workspace::v1::client::ext_workspace_group_handle_v1::GroupCapabilities;
 use wayland_protocols::ext::workspace::v1::client::ext_workspace_handle_v1::WorkspaceCapabilities as ExtWorkspaceCapabilities;
 
-pub fn list_groups(app_data: &AppData) {
-    println!("Workspace Groups:");
+pub fn list_groups(app_data: &AppData, printer: &mut impl Print) -> Result<()> {
+    let mut printer = printer.sub_list("Workspace Groups")?;
     for wg in app_data.workspace_state.workspace_groups() {
-        print_displays(app_data, &wg.outputs);
-        println!("workspace count: {}", wg.workspaces.len());
-        println!(
-            "can create workspace: {}",
-            wg.capabilities.contains(GroupCapabilities::CreateWorkspace)
-        );
-        println!();
+        let mut printer = printer.sub_struct()?;
+        print_displays(app_data, &mut printer, &wg.outputs)?;
+        printer.field("workspace count", wg.workspaces.len())?;
+        printer.field(
+            "can create workspace",
+            wg.capabilities.contains(GroupCapabilities::CreateWorkspace),
+        )?;
     }
+
+    Ok(())
 }
 
-pub fn list(app_data: &AppData, print_capabilities: bool) {
-    let _ = app_data;
-    println!("Workspaces:");
+pub fn list(app_data: &AppData, printer: &mut impl Print, print_capabilities: bool) -> Result<()> {
+    let mut printer = printer.sub_list("Workspaces")?;
     for workspace in app_data.workspace_state.workspaces() {
-        println!("Name: {}", workspace.name);
-        print_otpion(workspace.id.as_ref(), "wayland id");
-        log::debug!(
-            "CosmicId: {:?}",
-            workspace.cosmic_handle.as_ref().map(|h| h.id())
-        );
-        log::debug!("ExtId: {:?}", workspace.handle.id());
+        let mut printer = printer.sub_struct()?;
+        printer.field("Name", &workspace.name)?;
+        printer.optional("wayland id", workspace.id.as_ref())?;
         let displays =
             get_groups_for_workspace(workspace, app_data).flat_map(|wg| wg.outputs.iter());
-        print_displays(app_data, displays);
-        println!("Tiling: {}", is_workspace_tiling(workspace));
-        println!(
-            "Toplevel count: {}",
-            workspace_toplevels(workspace, app_data).count()
-        );
+        print_displays(app_data, &mut printer, displays)?;
+        printer.field("Tiling", is_workspace_tiling(workspace))?;
+        printer.field(
+            "Toplevel count",
+            workspace_toplevels(workspace, app_data).count(),
+        )?;
         if print_capabilities {
-            println!("Capabilities:");
+            let mut printer =
+                printer.sub_list_with("Capabilities", ListOptions { inline: true })?;
             if workspace
                 .cosmic_capabilities
                 .contains(WorkspaceCapabilities::Move)
             {
-                println!("\tmove");
+                printer.item("move")?;
             }
             if workspace
                 .cosmic_capabilities
                 .contains(WorkspaceCapabilities::Pin)
             {
-                println!("\tpin");
+                printer.item("pin")?;
             }
             if workspace
                 .cosmic_capabilities
                 .contains(WorkspaceCapabilities::Rename)
             {
-                println!("\trename");
+                printer.item("rename")?;
             }
             if workspace
                 .cosmic_capabilities
                 .contains(WorkspaceCapabilities::Pin)
             {
-                println!("\tset tiling");
+                printer.item("set tiling")?;
             }
             if workspace
                 .capabilities
                 .contains(ExtWorkspaceCapabilities::Activate)
             {
-                println!("\tactivate");
+                printer.item("activate")?;
             }
             if workspace
                 .capabilities
                 .contains(ExtWorkspaceCapabilities::Assign)
             {
-                println!("\tassign");
+                printer.item("assign")?;
             }
             if workspace
                 .capabilities
                 .contains(ExtWorkspaceCapabilities::Deactivate)
             {
-                println!("\tdeactivate");
+                printer.item("deactivate")?;
             }
             if workspace
                 .capabilities
                 .contains(ExtWorkspaceCapabilities::Remove)
             {
-                println!("\tremove");
+                printer.item("remove")?;
             }
         }
-
-        println!();
     }
+    Ok(())
 }
 
 pub fn get_workspace<'a>(
     app_data: &'a AppData,
     workspace: &WorkspaceIdent,
-) -> Option<(&'a WorkspaceGroup, usize, &'a Workspace)> {
+) -> Result<(&'a WorkspaceGroup, usize, &'a Workspace)> {
     if let Some(display) = workspace.display.as_ref() {
         let Some(group) = app_data.workspace_state.workspace_groups().find(|group| {
             group
@@ -117,8 +116,7 @@ pub fn get_workspace<'a>(
                 .filter_map(|o| app_data.output_state.info(o))
                 .any(|o| &output::display_name(&o) == display)
         }) else {
-            error!("Unknonw display: {}", display);
-            return None;
+            bail!("Unknonw display: {}", display);
         };
 
         let Some((workspace_pos, workspace)) = group
@@ -126,7 +124,6 @@ pub fn get_workspace<'a>(
             .iter()
             .enumerate()
             .filter_map(|(i, handle)| {
-                log::debug!("{i}: {handle:?}");
                 app_data
                     .workspace_state
                     .workspace_info(handle)
@@ -134,14 +131,13 @@ pub fn get_workspace<'a>(
             })
             .find(|(_, w)| w.name == workspace.name)
         else {
-            error!(
+            bail!(
                 "Workspace {} does not exist on display {display}",
                 workspace.name
             );
-            return None;
         };
 
-        Some((group, workspace_pos, workspace))
+        Ok((group, workspace_pos, workspace))
     } else {
         let mut candidate_workspaces = app_data
             .workspace_state
@@ -149,16 +145,14 @@ pub fn get_workspace<'a>(
             .filter(|w| w.name == workspace.name);
 
         let Some(workspace) = candidate_workspaces.next() else {
-            error!("Workspace {} does not exist", workspace.name);
-            return None;
+            bail!("Workspace {} does not exist", workspace.name);
         };
 
         if candidate_workspaces.next().is_some() {
-            error!(
+            bail!(
                 "Found multiple workspaces with name {}. Specify display to narrow down selection",
                 workspace.name
             );
-            return None;
         }
 
         let Some((workspace_pos, group)) = app_data
@@ -167,33 +161,30 @@ pub fn get_workspace<'a>(
             .enumerate()
             .find(|(_, group)| group.workspaces.contains(&workspace.handle))
         else {
-            error!(
+            bail!(
                 "Found workspace {} but could not access it's group",
                 workspace.name
             );
-            return None;
         };
 
-        Some((group, workspace_pos, workspace))
+        Ok((group, workspace_pos, workspace))
     }
 }
 
-pub fn pin(app_data: &AppData, workspace: WorkspaceIdent, pin: bool) {
-    let Ok(workspace_manager) = app_data.workspace_state.workspace_manager().get() else {
-        warn!("could not get acccess to workspace manager");
-        return;
-    };
+pub fn pin(app_data: &AppData, workspace: WorkspaceIdent, pin: bool) -> Result<()> {
+    let workspace_manager = app_data
+        .workspace_state
+        .workspace_manager()
+        .get()
+        .context("could not get acccess to workspace manager")?;
 
-    let Some((_, _, workspace)) = get_workspace(app_data, &workspace) else {
-        return;
-    };
+    let (_, _, workspace) = get_workspace(app_data, &workspace)?;
 
     let Some(cosmic_handle) = workspace.cosmic_handle.as_ref() else {
-        error!(
+        bail!(
             "INTERNAL: No cosmic handle for workspace {}",
             workspace.name
         );
-        return;
     };
 
     if pin {
@@ -202,20 +193,23 @@ pub fn pin(app_data: &AppData, workspace: WorkspaceIdent, pin: bool) {
         cosmic_handle.unpin();
     }
     workspace_manager.commit();
+
+    Ok(())
 }
 
-pub fn activate(app_data: &AppData, workspace: WorkspaceIdent) {
-    let Ok(workspace_manager) = app_data.workspace_state.workspace_manager().get() else {
-        warn!("could not get acccess to workspace manager");
-        return;
-    };
+pub fn activate(app_data: &AppData, workspace: WorkspaceIdent) -> Result<()> {
+    let workspace_manager = app_data
+        .workspace_state
+        .workspace_manager()
+        .get()
+        .context("could not get acccess to workspace manager")?;
 
-    let Some((_, _, workspace)) = get_workspace(app_data, &workspace) else {
-        return;
-    };
+    let (_, _, workspace) = get_workspace(app_data, &workspace)?;
 
     workspace.handle.activate();
     workspace_manager.commit();
+
+    Ok(())
 }
 
 /// Move the workspace to position and display
@@ -229,15 +223,14 @@ pub fn move_to(
     workspace: WorkspaceIdent,
     target_position: usize,
     target_display: Option<&str>,
-) {
-    let Ok(workspace_manager) = app_data.workspace_state.workspace_manager().get() else {
-        warn!("could not get acccess to workspace manager");
-        return;
-    };
+) -> Result<()> {
+    let workspace_manager = app_data
+        .workspace_state
+        .workspace_manager()
+        .get()
+        .context("could not get acccess to workspace manager")?;
 
-    let Some((orig_group, current_pos, workspace)) = get_workspace(app_data, &workspace) else {
-        return;
-    };
+    let (orig_group, current_pos, workspace) = get_workspace(app_data, &workspace)?;
 
     let group = if let Some(target_display) = target_display {
         let Some(group) = app_data.workspace_state.workspace_groups().find(|group| {
@@ -247,8 +240,7 @@ pub fn move_to(
                 .filter_map(|o| app_data.output_state.info(o))
                 .any(|o| &output::display_name(&o) == target_display)
         }) else {
-            error!("Unknonw display: {}", target_display);
-            return;
+            bail!("Unknonw display: {}", target_display);
         };
         group
     } else {
@@ -273,11 +265,10 @@ pub fn move_to(
     };
 
     if current_pos == position && orig_group.handle.id() == group.handle.id() {
-        warn!(
+        bail!(
             "workspace {} already at position {position}",
             workspace.name
         );
-        return;
     }
 
     let (other_pos, move_after) = if position == 0 {
@@ -295,29 +286,20 @@ pub fn move_to(
     const AXIS: u32 = 0;
 
     let Some(cosmic_handle) = workspace.cosmic_handle.as_ref() else {
-        error!(
+        bail!(
             "INTERNAL: No cosmic handle for workspace {}",
             workspace.name
         );
-        return;
     };
 
     if move_after {
-        log::debug!(
-            "move {:?} after {:?}",
-            cosmic_handle.id(),
-            other_workspace.id()
-        );
         cosmic_handle.move_after(other_workspace, AXIS);
     } else {
-        log::debug!(
-            "move {:?} before {:?}",
-            cosmic_handle.id(),
-            other_workspace.id()
-        );
         cosmic_handle.move_before(other_workspace, AXIS);
     }
     workspace_manager.commit();
+
+    Ok(())
 }
 
 pub fn is_workspace_tiling(workspace: &Workspace) -> bool {
