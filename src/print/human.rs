@@ -32,32 +32,29 @@ impl<'w, W: Write> SaveDrop for Printer<'w, W> {
     }
 }
 
-impl<'w, W: Write> Print for Printer<'w, W> {
+impl<'w, W: Write> Print<W> for Printer<'w, W> {
     fn field<D: std::fmt::Display>(&mut self, name: &str, value: D) -> Result<()> {
         writeln!(self.writer, "{}{name}: {value}", self.indent)?;
         Ok(())
     }
 
-    fn sub_struct(&mut self, name: &str) -> Result<impl Print> {
+    fn sub_struct(&mut self, name: &str) -> Result<super::Printer<W>> {
         writeln!(self.writer, "{}{name}", self.indent)?;
         Ok(Printer {
             writer: self.writer,
             end_with_nl: true,
             indent: format!("{INDENT}{}", self.indent),
-        })
+        }
+        .into())
     }
 
-    fn sub_list_with(&mut self, name: &str, options: ListOptions) -> Result<impl PrintList> {
+    fn sub_list_with(&mut self, name: &str, options: ListOptions) -> Result<super::ListPrinter<W>> {
         if options.inline {
             write!(self.writer, "{}{name}: ", self.indent)?;
         } else {
             writeln!(self.writer, "{}{name}:", self.indent)?;
         }
-        Ok(ListPrinter::new(
-            self.writer,
-            format!("{INDENT}{}", self.indent),
-            options,
-        ))
+        Ok(ListPrinter::new(self.writer, format!("{INDENT}{}", self.indent), options).into())
     }
 }
 
@@ -97,7 +94,7 @@ impl<'w, W: Write> SaveDrop for ListPrinter<'w, W> {
     }
 }
 
-impl<'w, W: Write> PrintList for ListPrinter<'w, W> {
+impl<'w, W: Write> PrintList<W> for ListPrinter<'w, W> {
     fn item<D: std::fmt::Display>(&mut self, value: D) -> Result<()> {
         self.counter += 1;
         if self.options.inline {
@@ -111,7 +108,7 @@ impl<'w, W: Write> PrintList for ListPrinter<'w, W> {
         Ok(())
     }
 
-    fn sub_struct(&mut self) -> Result<impl Print> {
+    fn sub_struct(&mut self) -> Result<super::Printer<W>> {
         ensure!(
             !self.options.inline,
             "Inline list does not support inner struct"
@@ -122,10 +119,11 @@ impl<'w, W: Write> PrintList for ListPrinter<'w, W> {
             writer: self.writer,
             end_with_nl: true,
             indent: self.indent.clone(),
-        })
+        }
+        .into())
     }
 
-    fn sub_list_with(&mut self, options: ListOptions) -> Result<impl PrintList> {
+    fn sub_list_with(&mut self, options: ListOptions) -> Result<super::ListPrinter<W>> {
         ensure!(
             !self.options.inline,
             "Inline list does not support inner list"
@@ -141,7 +139,8 @@ impl<'w, W: Write> PrintList for ListPrinter<'w, W> {
             end_with_nl: true,
             indent: format!("{INDENT}{}", self.indent),
             options,
-        })
+        }
+        .into())
     }
 }
 

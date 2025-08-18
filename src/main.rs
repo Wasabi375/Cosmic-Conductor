@@ -14,10 +14,11 @@ use cosmic_client_toolkit::{
     workspace::WorkspaceState,
 };
 use log::{LevelFilter, debug, trace};
+use print::SaveDrop;
 use simple_logger::SimpleLogger;
 use wayland_client::{Connection, globals::registry_queue_init};
 
-use std::{cmp::min, thread, time::Duration};
+use std::{cmp::min, io::Write, thread, time::Duration};
 
 fn main() -> anyhow::Result<()> {
     SimpleLogger::new()
@@ -65,10 +66,10 @@ fn main() -> anyhow::Result<()> {
     debug!("finished {count} wayland event roundtrips");
 
     let mut stdout = std::io::stdout();
+    let mut json_buffer = String::new();
     let mut printer = match args.format {
-        args::OutputFormat::Human => print::human::Printer::new(&mut stdout),
-        args::OutputFormat::Json => todo!(),
-        args::OutputFormat::JsonPretty => todo!(),
+        args::OutputFormat::Human => print::human(&mut stdout),
+        args::OutputFormat::Json | args::OutputFormat::JsonPretty => print::json(&mut json_buffer)?,
     };
 
     match args.command {
@@ -108,11 +109,18 @@ fn main() -> anyhow::Result<()> {
     }
     event_queue.flush().unwrap();
 
-    Ok(())
-}
+    printer.save_drop()?;
+    drop(printer);
 
-pub fn print_otpion<D: std::fmt::Display>(value: Option<D>, info: &str) {
-    if let Some(value) = value {
-        println!("{}: {}", info, value);
+    match args.format {
+        args::OutputFormat::Json => {
+            writeln!(stdout, "{json_buffer}")?;
+        }
+        args::OutputFormat::JsonPretty => todo!("format json"),
+        _ => {
+            // nothing to do, format prints directly to stdout
+        }
     }
+
+    Ok(())
 }

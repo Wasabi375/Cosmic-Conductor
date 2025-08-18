@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use anyhow::Result;
 
 use cosmic_client_toolkit::sctk::output::OutputInfo;
@@ -6,7 +8,6 @@ use wayland_client::protocol::wl_output::WlOutput;
 use crate::{
     cosmic::AppData,
     print::{Print, PrintList},
-    print_otpion,
 };
 
 pub fn display_name(output: &OutputInfo) -> String {
@@ -17,9 +18,9 @@ pub fn display_name(output: &OutputInfo) -> String {
     }
 }
 
-pub fn print_displays<'a, O: IntoIterator<Item = &'a WlOutput>>(
+pub fn print_displays<'a, O: IntoIterator<Item = &'a WlOutput>, W: Write>(
     app_data: &AppData,
-    printer: &mut impl Print,
+    printer: &mut impl Print<W>,
     outputs: O,
 ) -> Result<()> {
     printer.inline_list(
@@ -45,7 +46,7 @@ pub fn find(app_data: &AppData, display: &str) -> Option<(WlOutput, OutputInfo)>
         .find(|(_, o)| &display_name(o) == display)
 }
 
-pub fn list(app_data: &AppData, printer: &mut impl Print) -> Result<()> {
+pub fn list<W: Write>(app_data: &AppData, printer: &mut impl Print<W>) -> Result<()> {
     let mut printer = printer.sub_list("Outputs")?;
     for output in app_data
         .output_state

@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use anyhow::{Result, bail};
 use itertools::Itertools;
 
@@ -9,9 +11,9 @@ use crate::{
     workspace::get_workspace,
 };
 
-pub fn list(
+pub fn list<W: Write>(
     app_data: &AppData,
-    printer: &mut impl Print,
+    printer: &mut impl Print<W>,
     workspace: Option<String>,
     display: Option<String>,
 ) -> Result<()> {

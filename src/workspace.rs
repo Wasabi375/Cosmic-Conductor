@@ -1,9 +1,10 @@
+use std::io::Write;
+
 use crate::{
     args::WorkspaceIdent,
     cosmic::AppData,
     output::{self, print_displays},
     print::{ListOptions, Print, PrintList},
-    print_otpion,
 };
 
 use anyhow::{Context, Result, bail};
@@ -19,7 +20,7 @@ use wayland_client::Proxy;
 use wayland_protocols::ext::workspace::v1::client::ext_workspace_group_handle_v1::GroupCapabilities;
 use wayland_protocols::ext::workspace::v1::client::ext_workspace_handle_v1::WorkspaceCapabilities as ExtWorkspaceCapabilities;
 
-pub fn list_groups(app_data: &AppData, printer: &mut impl Print) -> Result<()> {
+pub fn list_groups<W: Write>(app_data: &AppData, printer: &mut impl Print<W>) -> Result<()> {
     let mut printer = printer.sub_list("Workspace Groups")?;
     for wg in app_data.workspace_state.workspace_groups() {
         let mut printer = printer.sub_struct()?;
@@ -34,7 +35,11 @@ pub fn list_groups(app_data: &AppData, printer: &mut impl Print) -> Result<()> {
     Ok(())
 }
 
-pub fn list(app_data: &AppData, printer: &mut impl Print, print_capabilities: bool) -> Result<()> {
+pub fn list<W: Write>(
+    app_data: &AppData,
+    printer: &mut impl Print<W>,
+    print_capabilities: bool,
+) -> Result<()> {
     let mut printer = printer.sub_list("Workspaces")?;
     for workspace in app_data.workspace_state.workspaces() {
         let mut printer = printer.sub_struct()?;
