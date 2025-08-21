@@ -3,6 +3,11 @@ name = "cosmic-conductor"
 version = "0.1.0"
 edition = "2024"
 
+[workspace]
+members = [
+    "xtask"
+]
+
 [dependencies]
 clap = { version = "4.5.42", features = ["derive"] }
 cosmic-protocols = { version = "0.1.0", git = "https://github.com/pop-os/cosmic-protocols" }
@@ -14,3 +19,4 @@ wayland-protocols = "0.32.9"
 itertools = "0.14.0"
 anyhow = "1.0.99"
 json_pretty = "0.1.2"
+
