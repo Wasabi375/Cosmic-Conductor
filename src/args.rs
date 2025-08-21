@@ -159,6 +159,9 @@ pub enum ToplevelSubcommand {
         toggle: bool,
     },
 
+    /// Activate the toplevel
+    Activate { id: String },
+
     /// Move toplevel to workspace
     Move {
         id: String,

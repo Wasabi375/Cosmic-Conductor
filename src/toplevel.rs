@@ -240,3 +240,28 @@ pub fn move_to(app_data: &AppData, id: &str, workspace: WorkspaceIdent) -> Resul
 
     Ok(())
 }
+
+pub fn activate(app_data: &AppData, id: &str) -> Result<()> {
+    let toplevel = find_from_id(app_data, id)?;
+
+    let seat = app_data
+        .seat_state
+        .seats()
+        .exactly_one()
+        .ok()
+        .context("Could not get wayland seat")?;
+
+    let Some(handle) = toplevel.cosmic_toplevel.as_ref() else {
+        bail!(
+            "INTERNAL: No cosmic handle for toplevel {}",
+            toplevel.identifier
+        );
+    };
+
+    app_data
+        .toplevel_manager_state
+        .manager
+        .activate(handle, &seat);
+
+    Ok(())
+}

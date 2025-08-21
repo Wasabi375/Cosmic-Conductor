@@ -3,6 +3,7 @@ use cosmic_client_toolkit::{
         self,
         output::{OutputHandler, OutputState},
         registry::{ProvidesRegistryState, RegistryState},
+        seat::{SeatHandler, SeatState},
     },
     toplevel_info::{ToplevelInfoHandler, ToplevelInfoState},
     toplevel_management::{ToplevelManagerHandler, ToplevelManagerState},
@@ -18,6 +19,7 @@ pub struct AppData {
     pub workspace_state: WorkspaceState,
     pub toplevel_info_state: ToplevelInfoState,
     pub toplevel_manager_state: ToplevelManagerState,
+    pub seat_state: SeatState,
 
     pub toplevl_done: bool,
     pub workspace_done: bool,
@@ -26,6 +28,7 @@ pub struct AppData {
 
 sctk::delegate_output!(AppData);
 sctk::delegate_registry!(AppData);
+sctk::delegate_seat!(AppData);
 cosmic_client_toolkit::delegate_workspace!(AppData);
 cosmic_client_toolkit::delegate_toplevel_info!(AppData);
 cosmic_client_toolkit::delegate_toplevel_manager!(AppData);
@@ -136,5 +139,49 @@ impl ToplevelManagerHandler for AppData {
         >,
     ) {
         trace!("toplevel manager cap: {capabilities:?}");
+    }
+}
+
+impl SeatHandler for AppData {
+    fn seat_state(&mut self) -> &mut SeatState {
+        &mut self.seat_state
+    }
+
+    fn new_seat(
+        &mut self,
+        _conn: &wayland_client::Connection,
+        _qh: &QueueHandle<Self>,
+        seat: wayland_client::protocol::wl_seat::WlSeat,
+    ) {
+        trace!("new seat: {seat:?}");
+    }
+
+    fn new_capability(
+        &mut self,
+        _conn: &wayland_client::Connection,
+        _qh: &QueueHandle<Self>,
+        seat: wayland_client::protocol::wl_seat::WlSeat,
+        capability: sctk::seat::Capability,
+    ) {
+        trace!("new seat capability {capability:?} for {seat:?}");
+    }
+
+    fn remove_capability(
+        &mut self,
+        _conn: &wayland_client::Connection,
+        _qh: &QueueHandle<Self>,
+        seat: wayland_client::protocol::wl_seat::WlSeat,
+        capability: sctk::seat::Capability,
+    ) {
+        trace!("seat capability {capability:?} removed from {seat:?}");
+    }
+
+    fn remove_seat(
+        &mut self,
+        _conn: &wayland_client::Connection,
+        _qh: &QueueHandle<Self>,
+        seat: wayland_client::protocol::wl_seat::WlSeat,
+    ) {
+        trace!("seat removed: {seat:?}");
     }
 }

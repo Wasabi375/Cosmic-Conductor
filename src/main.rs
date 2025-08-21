@@ -9,7 +9,7 @@ use args::{Arguments, Command, ToplevelSubcommand, WorkspaceIdent, WorkspaceSubc
 use clap::Parser;
 use cosmic::AppData;
 use cosmic_client_toolkit::{
-    sctk::{output::OutputState, registry::RegistryState},
+    sctk::{output::OutputState, registry::RegistryState, seat::SeatState},
     toplevel_info::ToplevelInfoState,
     toplevel_management::ToplevelManagerState,
     workspace::WorkspaceState,
@@ -43,6 +43,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut app_data = AppData {
         output_state: OutputState::new(&globals, &qh),
+        seat_state: SeatState::new(&globals, &qh),
         workspace_state: WorkspaceState::new(&registry_state, &qh),
         toplevel_info_state: ToplevelInfoState::new(&registry_state, &qh),
         toplevel_manager_state: ToplevelManagerState::new(&registry_state, &qh),
@@ -82,6 +83,7 @@ fn main() -> anyhow::Result<()> {
                 workspace,
                 geometry,
             } => toplevel::list(&app_data, &mut printer, workspace, display, geometry)?,
+            ToplevelSubcommand::Activate { id } => toplevel::activate(&app_data, &id)?,
             ToplevelSubcommand::Max {
                 id,
                 unset: minimize,
