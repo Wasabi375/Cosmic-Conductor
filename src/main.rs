@@ -5,7 +5,7 @@ mod print;
 mod toplevel;
 mod workspace;
 
-use args::{Arguments, Command, ToplevelSubcommand, WorkspaceSubcommand};
+use args::{Arguments, Command, ToplevelSubcommand, WorkspaceIdent, WorkspaceSubcommand};
 use clap::Parser;
 use cosmic::AppData;
 use cosmic_client_toolkit::{
@@ -102,6 +102,18 @@ fn main() -> anyhow::Result<()> {
                 minimize,
                 toggle,
             } => toplevel::sticky(&app_data, &id, SetStateAction::from(minimize, toggle)?)?,
+            ToplevelSubcommand::Move {
+                id,
+                workspace,
+                display,
+            } => toplevel::move_to(
+                &app_data,
+                &id,
+                WorkspaceIdent {
+                    name: workspace,
+                    display,
+                },
+            )?,
         },
         Command::Outputs => output::list(&app_data, &mut printer)?,
         Command::WorkspaceGroups => workspace::list_groups(&app_data, &mut printer)?,

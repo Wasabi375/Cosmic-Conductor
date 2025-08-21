@@ -158,6 +158,17 @@ pub enum ToplevelSubcommand {
         #[arg(short, long)]
         toggle: bool,
     },
+
+    /// Move toplevel to workspace
+    Move {
+        id: String,
+
+        workspace: String,
+
+        /// The display of the workspace if the name is not unique
+        #[arg(short, long)]
+        display: Option<String>,
+    },
 }
 
 impl Default for ToplevelSubcommand {

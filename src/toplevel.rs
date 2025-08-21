@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use anyhow::{Result, bail};
+use anyhow::{Context, Result, bail};
 use cosmic_client_toolkit::toplevel_info::ToplevelInfo;
 use cosmic_protocols::toplevel_info::v1::client::zcosmic_toplevel_handle_v1::State;
 use itertools::Itertools;
@@ -212,6 +212,32 @@ pub fn sticky(app_data: &AppData, id: &str, action: SetStateAction) -> Result<()
             }
         }
     }
+
+    Ok(())
+}
+
+pub fn move_to(app_data: &AppData, id: &str, workspace: WorkspaceIdent) -> Result<()> {
+    let toplevel = find_from_id(app_data, id)?;
+    let (group, _, workspace) = get_workspace(app_data, &workspace)?;
+
+    let output = group
+        .outputs
+        .iter()
+        .exactly_one()
+        .ok()
+        .context("Failed to get output for workspace group")?;
+
+    let Some(handle) = toplevel.cosmic_toplevel.as_ref() else {
+        bail!(
+            "INTERNAL: No cosmic handle for toplevel {}",
+            toplevel.identifier
+        );
+    };
+
+    app_data
+        .toplevel_manager_state
+        .manager
+        .move_to_ext_workspace(handle, &workspace.handle, output);
 
     Ok(())
 }
