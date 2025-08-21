@@ -2,6 +2,11 @@
 
 ## [Unreleased] - ReleaseDate
 
+
+### Fixes
+
+* no longer print "-" on empty workspace state/capabilities
+
 ## [0.2.0] - 2025-08-21
 
 ### Features

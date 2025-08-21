@@ -67,9 +67,6 @@ pub fn list<W: Write>(
             if workspace.state.contains(State::Urgent) {
                 printer.item("urgent")?;
             }
-            if workspace.state.is_empty() {
-                printer.item("-")?;
-            }
         }
         if print_capabilities {
             let mut printer =
@@ -121,9 +118,6 @@ pub fn list<W: Write>(
                 .contains(ExtWorkspaceCapabilities::Remove)
             {
                 printer.item("remove")?;
-            }
-            if workspace.capabilities.is_empty() && workspace.cosmic_capabilities.is_empty() {
-                printer.item("-")?;
             }
         }
     }
