@@ -15,6 +15,49 @@ Currently this is build against COSMIC Alpha 7.
 
 This project has a [changelog](CHANGELOG.md)
 
+## Install
+
+### NixOs
+
+After adding this flake(`"github:Wasabi375/nix-wasabipkgs/main"`) to your inputs
+you can install this using `pkgs-wasabi.cosmic-conductor`.
+```nix
+inputs = {
+  nixpkgs.url = "nixpkgs/nixos-25.05";
+  wasabi375.url = "github:Wasabi375/nix-wasabipkgs/main";
+  wasabi375.inputs.nixpkgs.follows = "nixpkgs";
+};
+
+outputs = { self, nixpkgs, wasabi375, ... }:
+let
+  lib = nixpkgs.lib;
+  pkgs-wasabi = wasabi375.legacyPackages.x86_64-linux;
+in
+{
+  nixosConfigurations.x86_64-linux = lib.nixosSystem {
+    modules = [
+      ./configuration.nix
+    ];
+    specialArgs = {
+      inherit pkgs-wasabi;
+    };
+  };
+};
+```
+
+
+## From Source
+
+After cloning this repository you can simply install cosmic-conductor using cargo.
+```
+cargo install --path .
+```
+
+To install man pages and completions you can go into the `xtask` directory and
+run `cargo run -- man` and `cargo run -- completion`. This will generate the 
+necessary files in `target/assets`.
+See `cargo run -- help` for more information.
+
 
 ## Contributions
 
