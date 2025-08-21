@@ -43,7 +43,7 @@ pub fn find(app_data: &AppData, display: &str) -> Option<(WlOutput, OutputInfo)>
                 .info(&handle)
                 .map(|info| (handle, info))
         })
-        .find(|(_, o)| &display_name(o) == display)
+        .find(|(_, o)| display_name(o) == display)
 }
 
 pub fn list<W: Write>(app_data: &AppData, printer: &mut impl Print<W>) -> Result<()> {

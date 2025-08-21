@@ -264,7 +264,7 @@ pub fn move_to(
                 .outputs
                 .iter()
                 .filter_map(|o| app_data.output_state.info(o))
-                .any(|o| &output::display_name(&o) == target_display)
+                .any(|o| output::display_name(&o) == target_display)
         }) else {
             bail!("Unknonw display: {}", target_display);
         };
