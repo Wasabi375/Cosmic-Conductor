@@ -17,8 +17,10 @@ use cosmic_protocols::workspace::v2::client::zcosmic_workspace_handle_v2::{
 };
 use log::warn;
 use wayland_client::Proxy;
-use wayland_protocols::ext::workspace::v1::client::ext_workspace_group_handle_v1::GroupCapabilities;
 use wayland_protocols::ext::workspace::v1::client::ext_workspace_handle_v1::WorkspaceCapabilities as ExtWorkspaceCapabilities;
+use wayland_protocols::ext::workspace::v1::client::{
+    ext_workspace_group_handle_v1::GroupCapabilities, ext_workspace_handle_v1,
+};
 
 pub fn list_groups<W: Write>(app_data: &AppData, printer: &mut impl Print<W>) -> Result<()> {
     let mut printer = printer.sub_list("Workspace Groups")?;
@@ -53,6 +55,22 @@ pub fn list<W: Write>(
             "Toplevel count",
             workspace_toplevels(workspace, app_data).count(),
         )?;
+        {
+            use ext_workspace_handle_v1::State;
+            let mut printer = printer.sub_list_with("State", ListOptions { inline: true })?;
+            if workspace.state.contains(State::Active) {
+                printer.item("active")?;
+            }
+            if workspace.state.contains(State::Hidden) {
+                printer.item("hidden")?;
+            }
+            if workspace.state.contains(State::Urgent) {
+                printer.item("urgent")?;
+            }
+            if workspace.state.is_empty() {
+                printer.item("-")?;
+            }
+        }
         if print_capabilities {
             let mut printer =
                 printer.sub_list_with("Capabilities", ListOptions { inline: true })?;
@@ -103,6 +121,9 @@ pub fn list<W: Write>(
                 .contains(ExtWorkspaceCapabilities::Remove)
             {
                 printer.item("remove")?;
+            }
+            if workspace.capabilities.is_empty() && workspace.cosmic_capabilities.is_empty() {
+                printer.item("-")?;
             }
         }
     }

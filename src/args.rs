@@ -61,7 +61,6 @@ pub enum Command {
 #[derive(Subcommand, Debug)]
 pub enum ToplevelSubcommand {
     /// List all toplevels
-    #[command()]
     #[clap(alias = "l")]
     List {
         /// limit toplevels to workspace
@@ -77,6 +76,87 @@ pub enum ToplevelSubcommand {
         /// show the geometry of each toplevel
         #[arg(short, long)]
         geometry: bool,
+    },
+    /// maximize the toplevel
+    Max {
+        /// the unique id of the toplevel
+        ///
+        /// It is enough to provide the first characters as long as they
+        /// are unique.
+        id: String,
+
+        /// undo maximize toplevel instead
+        ///
+        /// can't be used with toggle
+        #[arg(short, long)]
+        unset: bool,
+
+        /// toggle toplevel maximize state
+        ///
+        /// can't be used with unset
+        #[arg(short, long)]
+        toggle: bool,
+    },
+    /// minimize the toplevel
+    Min {
+        /// the unique id of the toplevel
+        ///
+        /// It is enough to provide the first characters as long as they
+        /// are unique.
+        id: String,
+
+        /// undo minimize
+        ///
+        /// can't be used with toggle
+        #[arg(short, long)]
+        unset: bool,
+
+        /// toggle toplevel minimiz state
+        ///
+        /// can't be used with unset
+        #[arg(short, long)]
+        toggle: bool,
+    },
+    /// fullscreen the toplevel
+    #[clap(alias = "full")]
+    Fullscreen {
+        /// the unique id of the toplevel
+        ///
+        /// It is enough to provide the first characters as long as they
+        /// are unique.
+        id: String,
+
+        /// fullscreen toplevel instead
+        ///
+        /// can't be used with toggle
+        #[arg(short, long)]
+        minimize: bool,
+
+        /// toggle toplevel fullscreen state
+        ///
+        /// can't be used with unset
+        #[arg(short, long)]
+        toggle: bool,
+    },
+    /// mark the toplevel as sticky
+    Sticky {
+        /// the unique id of the toplevel
+        ///
+        /// It is enough to provide the first characters as long as they
+        /// are unique.
+        id: String,
+
+        /// unset sticky for toplevel instead
+        ///
+        /// can't be used with toggle
+        #[arg(short, long)]
+        minimize: bool,
+
+        /// toggle toplevel sticky state
+        ///
+        /// can't be used with unset
+        #[arg(short, long)]
+        toggle: bool,
     },
 }
 

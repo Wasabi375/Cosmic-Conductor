@@ -11,11 +11,13 @@ use cosmic::AppData;
 use cosmic_client_toolkit::{
     sctk::{output::OutputState, registry::RegistryState},
     toplevel_info::ToplevelInfoState,
+    toplevel_management::ToplevelManagerState,
     workspace::WorkspaceState,
 };
 use log::{LevelFilter, debug, trace};
 use print::SaveDrop;
 use simple_logger::SimpleLogger;
+use toplevel::SetStateAction;
 use wayland_client::{Connection, globals::registry_queue_init};
 
 use std::{cmp::min, io::Write, thread, time::Duration};
@@ -43,6 +45,7 @@ fn main() -> anyhow::Result<()> {
         output_state: OutputState::new(&globals, &qh),
         workspace_state: WorkspaceState::new(&registry_state, &qh),
         toplevel_info_state: ToplevelInfoState::new(&registry_state, &qh),
+        toplevel_manager_state: ToplevelManagerState::new(&registry_state, &qh),
         registry_state,
         toplevl_done: false,
         workspace_done: false,
@@ -79,6 +82,26 @@ fn main() -> anyhow::Result<()> {
                 workspace,
                 geometry,
             } => toplevel::list(&app_data, &mut printer, workspace, display, geometry)?,
+            ToplevelSubcommand::Max {
+                id,
+                unset: minimize,
+                toggle,
+            } => toplevel::maximize(&app_data, &id, SetStateAction::from(minimize, toggle)?)?,
+            ToplevelSubcommand::Min {
+                id,
+                unset: minimize,
+                toggle,
+            } => toplevel::minimize(&app_data, &id, SetStateAction::from(minimize, toggle)?)?,
+            ToplevelSubcommand::Fullscreen {
+                id,
+                minimize,
+                toggle,
+            } => toplevel::fullscreen(&app_data, &id, SetStateAction::from(minimize, toggle)?)?,
+            ToplevelSubcommand::Sticky {
+                id,
+                minimize,
+                toggle,
+            } => toplevel::sticky(&app_data, &id, SetStateAction::from(minimize, toggle)?)?,
         },
         Command::Outputs => output::list(&app_data, &mut printer)?,
         Command::WorkspaceGroups => workspace::list_groups(&app_data, &mut printer)?,

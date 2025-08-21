@@ -5,6 +5,7 @@ use cosmic_client_toolkit::{
         registry::{ProvidesRegistryState, RegistryState},
     },
     toplevel_info::{ToplevelInfoHandler, ToplevelInfoState},
+    toplevel_management::{ToplevelManagerHandler, ToplevelManagerState},
     workspace::{WorkspaceHandler, WorkspaceState},
 };
 use log::trace;
@@ -16,6 +17,7 @@ pub struct AppData {
     pub registry_state: RegistryState,
     pub workspace_state: WorkspaceState,
     pub toplevel_info_state: ToplevelInfoState,
+    pub toplevel_manager_state: ToplevelManagerState,
 
     pub toplevl_done: bool,
     pub workspace_done: bool,
@@ -26,6 +28,7 @@ sctk::delegate_output!(AppData);
 sctk::delegate_registry!(AppData);
 cosmic_client_toolkit::delegate_workspace!(AppData);
 cosmic_client_toolkit::delegate_toplevel_info!(AppData);
+cosmic_client_toolkit::delegate_toplevel_manager!(AppData);
 
 impl ProvidesRegistryState for AppData {
     fn registry(&mut self) -> &mut RegistryState {
@@ -116,5 +119,22 @@ impl ToplevelInfoHandler for AppData {
     fn info_done(&mut self, _conn: &wayland_client::Connection, _qh: &QueueHandle<Self>) {
         trace!("toplevel info done");
         self.toplevl_done = true;
+    }
+}
+
+impl ToplevelManagerHandler for AppData {
+    fn toplevel_manager_state(&mut self) -> &mut ToplevelManagerState {
+        &mut self.toplevel_manager_state
+    }
+
+    fn capabilities(
+        &mut self,
+        _conn: &wayland_client::Connection,
+        _qh: &QueueHandle<Self>,
+        capabilities: Vec<
+            wayland_client::WEnum<cosmic_protocols::toplevel_management::v1::client::zcosmic_toplevel_manager_v1::ZcosmicToplelevelManagementCapabilitiesV1>,
+        >,
+    ) {
+        trace!("toplevel manager cap: {capabilities:?}");
     }
 }
