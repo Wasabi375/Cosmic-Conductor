@@ -20,3 +20,14 @@ itertools = "0.14.0"
 anyhow = "1.0.99"
 json_pretty = "0.1.2"
 
+
+[package.metadata.release]
+allow-branch = ["main"]
+publish = false
+pre-release-replacements = [
+  {file="CHANGELOG.md", search="Unreleased", replace="{{version}}"},
+  {file="CHANGELOG.md", search="\\.\\.\\.HEAD", replace="...{{tag_name}}", exactly=1},
+  {file="CHANGELOG.md", search="ReleaseDate", replace="{{date}}"},
+  {file="CHANGELOG.md", search="<!-- next-header -->", replace="<!-- next-header -->\n\n## [Unreleased] - ReleaseDate", exactly=1},
+  {file="CHANGELOG.md", search="<!-- next-url -->", replace="<!-- next-url -->\n[Unreleased]: https://github.com/wasabi375/cosmic-conductor/compare/{{tag_name}}...HEAD", exactly=1},
+]
