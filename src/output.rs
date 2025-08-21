@@ -27,7 +27,7 @@ pub fn print_displays<'a, O: IntoIterator<Item = &'a WlOutput>, W: Write>(
         "Displays",
         outputs
             .into_iter()
-            .filter_map(|handle| app_data.output_state.info(&handle))
+            .filter_map(|handle| app_data.output_state.info(handle))
             .map(|o| display_name(&o)),
     )?;
     Ok(())

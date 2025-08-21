@@ -22,7 +22,7 @@ impl<'w, W: Write> Printer<'w, W> {
     }
 }
 
-impl<'w, W: Write> SaveDrop for Printer<'w, W> {
+impl<W: Write> SaveDrop for Printer<'_, W> {
     fn save_drop(&mut self) -> Result<()> {
         if self.end_with_nl {
             self.end_with_nl = false;
@@ -32,7 +32,7 @@ impl<'w, W: Write> SaveDrop for Printer<'w, W> {
     }
 }
 
-impl<'w, W: Write> Print<W> for Printer<'w, W> {
+impl<W: Write> Print<W> for Printer<'_, W> {
     fn field<D: std::fmt::Display>(&mut self, name: &str, value: D) -> Result<()> {
         writeln!(self.writer, "{}{name}: {value}", self.indent)?;
         Ok(())
@@ -58,7 +58,7 @@ impl<'w, W: Write> Print<W> for Printer<'w, W> {
     }
 }
 
-impl<'w, W: Write> Drop for Printer<'w, W> {
+impl<W: Write> Drop for Printer<'_, W> {
     fn drop(&mut self) {
         self.save_drop().unwrap();
     }
@@ -84,7 +84,7 @@ impl<'w, W: Write> ListPrinter<'w, W> {
     }
 }
 
-impl<'w, W: Write> SaveDrop for ListPrinter<'w, W> {
+impl<W: Write> SaveDrop for ListPrinter<'_, W> {
     fn save_drop(&mut self) -> Result<()> {
         if self.end_with_nl {
             self.end_with_nl = false;
@@ -94,7 +94,7 @@ impl<'w, W: Write> SaveDrop for ListPrinter<'w, W> {
     }
 }
 
-impl<'w, W: Write> PrintList<W> for ListPrinter<'w, W> {
+impl<W: Write> PrintList<W> for ListPrinter<'_, W> {
     fn item<D: std::fmt::Display>(&mut self, value: D) -> Result<()> {
         self.counter += 1;
         if self.options.inline {
@@ -144,7 +144,7 @@ impl<'w, W: Write> PrintList<W> for ListPrinter<'w, W> {
     }
 }
 
-impl<'w, W: Write> Drop for ListPrinter<'w, W> {
+impl<W: Write> Drop for ListPrinter<'_, W> {
     fn drop(&mut self) {
         self.save_drop().unwrap();
     }

@@ -11,8 +11,8 @@ pub struct Printer<'a, W: Write> {
     _phantom: PhantomData<W>,
 }
 
-impl<'a, W: Write> Printer<'a, W> {
-    pub fn new<'n>(buffer: &'n mut String) -> Result<Printer<'n, W>> {
+impl<W: Write> Printer<'_, W> {
+    pub fn new(buffer: &mut String) -> Result<Printer<'_, W>> {
         write!(buffer, "{{")?;
         Ok(Printer {
             buffer,
@@ -109,15 +109,15 @@ impl<W: Write> PrintList<W> for ListPrinter<'_, W> {
         Ok(())
     }
 
-    fn sub_struct<'n>(&'n mut self) -> Result<super::Printer<'n, W>> {
+    fn sub_struct(&mut self) -> Result<super::Printer<'_, W>> {
         self.comma()?;
         Ok(Printer::new(self.buffer)?.into())
     }
 
-    fn sub_list_with<'n>(
-        &'n mut self,
+    fn sub_list_with(
+        &mut self,
         _options: super::ListOptions,
-    ) -> Result<super::ListPrinter<'n, W>> {
+    ) -> Result<super::ListPrinter<'_, W>> {
         self.comma()?;
         Ok(ListPrinter::new(self.buffer)?.into())
     }

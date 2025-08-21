@@ -87,11 +87,11 @@ pub trait Print<W: Write>: SaveDrop {
 pub trait PrintList<W: Write>: SaveDrop {
     fn item<D: Display>(&mut self, value: D) -> Result<()>;
 
-    fn sub_struct<'n>(&'n mut self) -> Result<Printer<'n, W>>;
-    fn sub_list_with<'n>(&'n mut self, options: ListOptions) -> Result<ListPrinter<'n, W>>;
+    fn sub_struct(&mut self) -> Result<Printer<'_, W>>;
+    fn sub_list_with(&mut self, options: ListOptions) -> Result<ListPrinter<'_, W>>;
 
     #[allow(dead_code)]
-    fn sub_list<'n>(&'n mut self) -> Result<ListPrinter<'n, W>> {
+    fn sub_list(&mut self) -> Result<ListPrinter<'_, W>> {
         self.sub_list_with(ListOptions::default())
     }
 

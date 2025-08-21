@@ -28,7 +28,7 @@ pub fn list<W: Write>(
                 display,
             };
             let (_, _, workspace) = get_workspace(app_data, &workspace_id)?;
-            crate::workspace::workspace_toplevels(&workspace, app_data).collect()
+            crate::workspace::workspace_toplevels(workspace, app_data).collect()
         }
         (None, Some(display)) => {
             let Some(display) = output::find(app_data, &display) else {
@@ -50,7 +50,7 @@ pub fn list<W: Write>(
         printer.field("Title", &toplevel.title)?;
         printer.field("AppId", &toplevel.app_id)?;
         printer.field("Unique Identifier", &toplevel.identifier)?;
-        let states = toplevel.state.iter().map(|s| DebugToDisplay(s));
+        let states = toplevel.state.iter().map(DebugToDisplay);
         printer.inline_list("State", states)?;
         let workspace = toplevel
             .workspace
@@ -62,8 +62,7 @@ pub fn list<W: Write>(
         printer.optional("workspace", workspace)?;
         let output = toplevel.output.iter().exactly_one().ok();
         let output_name = output
-            .map(|handle| app_data.output_state.info(handle))
-            .flatten()
+            .and_then(|handle| app_data.output_state.info(handle))
             .map(|o| output::display_name(&o));
         printer.optional("output", output_name)?;
         if show_geometry {

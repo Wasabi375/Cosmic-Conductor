@@ -329,7 +329,7 @@ pub fn move_to(
 }
 
 pub fn is_workspace_tiling(workspace: &Workspace) -> bool {
-    match workspace.tiling.map(|s| s.into_result().ok()).flatten() {
+    match workspace.tiling.and_then(|s| s.into_result().ok()) {
         Some(TilingState::TilingEnabled) => true,
         Some(_) | None => false,
     }
