@@ -6,7 +6,7 @@ A command line utility to control windows and working groups on the [COSMIC desk
 
 The COSMIC desktop is currently in alpha. Therefor it is expected for things to change and
 break. This program especially depends on the [cosmic wayland protocols](https://github.com/pop-os/cosmic-protocols)
-which are not stabalized. Therefor it is likely that functionality will break with updates
+which are not stabilized and it is likely that functionality will break with updates
 to COSMIC. 
 
 Currently this is build against COSMIC Alpha 7.
